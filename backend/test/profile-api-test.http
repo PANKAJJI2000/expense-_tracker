@@ -1,0 +1,55 @@
+### Variables
+@baseURL = http://localhost:3000/api/profiles
+@profileId = REPLACE_WITH_ACTUAL_ID
+
+### 1. Create a new profile
+POST {{baseURL}}
+Content-Type: application/json
+
+{
+  "name": "John Doe",
+  "email": "john.doe@example.com",
+  "phone": "+1234567890",
+  "profilePic": "https://example.com/profile.jpg",
+  "referredBy": "ABC123"
+}
+
+### 2. Get all profiles
+GET {{baseURL}}
+
+### 3. Get profile by ID
+GET {{baseURL}}/{{profileId}}
+
+### 4. Update profile
+PUT {{baseURL}}/{{profileId}}
+Content-Type: application/json
+
+{
+  "name": "John Smith",
+  "email": "john.smith@example.com",
+  "phone": "+1234567891"
+}
+
+### 5. Get profile by referral code
+GET {{baseURL}}/referral/ABC123
+
+### 6. Delete profile
+DELETE {{baseURL}}/{{profileId}}
+
+### 7. Test validation errors
+POST {{baseURL}}
+Content-Type: application/json
+
+{
+  "name": "A",
+  "email": "invalid-email"
+}
+
+### 8. Test duplicate email
+POST {{baseURL}}
+Content-Type: application/json
+
+{
+  "name": "Jane Doe",
+  "email": "john.doe@example.com"
+}
