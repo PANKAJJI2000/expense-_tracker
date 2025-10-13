@@ -38,6 +38,12 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
+      console.log('Attempting login to:', `${api.defaults.baseURL}/admin/login`)
+      console.log('API base URL:', api.defaults.baseURL)
+      
+      // Test basic connectivity first
+      console.log('Testing server connectivity...')
+      
       const response = await api.post('/admin/login', { email, password })
       const { token, user } = response.data
       
@@ -45,9 +51,53 @@ export const AuthProvider = ({ children }) => {
       setUser(user)
       return { success: true }
     } catch (error) {
+      console.error('Login error details:', {
+        message: error.message,
+        code: error.code,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        url: error.config?.url,
+        baseURL: error.config?.baseURL
+      })
+      
+      // Handle network errors
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        console.error('Network error - API server may be unreachable')
+        console.error('Trying to reach:', `${api.defaults.baseURL}/admin/login`)
+        
+        // Test if it's a DNS/connection issue
+        try {
+          const healthCheck = await fetch(`${api.defaults.baseURL}/api/health`, { 
+            method: 'GET',
+            mode: 'cors'
+          })
+          console.log('Health check response:', healthCheck.status)
+        } catch (healthError) {
+          console.error('Health check also failed:', healthError.message)
+        }
+        
+        return { 
+          success: false, 
+          error: `Unable to connect to server at ${api.defaults.baseURL}. Please check if the API server is running and accessible.` 
+        }
+      }
+      
+      // Handle CORS errors
+      if (error.message.includes('CORS') || error.code === 'ERR_BLOCKED_BY_CLIENT') {
+        console.error('CORS error detected')
+        return { 
+          success: false, 
+          error: 'CORS policy error. The server needs to allow requests from this domain.' 
+        }
+      }
+      
+      // Handle other errors
+      const errorMessage = error.response?.data?.message || error.message || 'Login failed'
+      console.error('Login failed with message:', errorMessage)
+      
       return { 
         success: false, 
-        error: error.response?.data?.message || 'Login failed' 
+        error: errorMessage
       }
     }
   }
