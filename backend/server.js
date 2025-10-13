@@ -29,9 +29,9 @@ mongoose.connect(process.env.MONGO_URI)
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? (process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [
-        'https://your-deployed-frontend.vercel.app',
-        'https://your-admin-panel.netlify.app',
-        'https://expense-tracker-frontend.com'
+        'https://expense-tracker-backend-henna.vercel.app',
+        'https://your-admin-panel.vercel.app',
+        // 'https://your-frontend.vercel.app'
       ])
     : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'http://127.0.0.1:5173'],
   credentials: true,
@@ -60,21 +60,26 @@ app.use('/api/categories', categoryRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
+  const baseUrl = process.env.NODE_ENV === 'production' 
+    ? 'https://expense-tracker-backend-henna.vercel.app'
+    : `http://localhost:${PORT}`;
+    
   res.json({ 
     status: 'Server running',
     environment: process.env.NODE_ENV,
     database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
     version: process.env.API_VERSION || 'v1',
     timestamp: new Date().toISOString(),
+    baseUrl: baseUrl,
     routes: {
-      auth: '/api/auth',
-      expenses: '/api/expenses',
-      profiles: '/api/profiles',
-      transactions: '/api/transactions',
-      transactionHistory: '/api/transaction-history',
-      autoExpenses: '/api/auto-expenses',
-      admin: '/api/admin',
-      categories: '/api/categories'
+      auth: `${baseUrl}/api/auth`,
+      expenses: `${baseUrl}/api/expenses`,
+      profiles: `${baseUrl}/api/profiles`,
+      transactions: `${baseUrl}/api/transactions`,
+      transactionHistory: `${baseUrl}/api/transaction-history`,
+      autoExpenses: `${baseUrl}/api/auto-expenses`,
+      admin: `${baseUrl}/api/admin`,
+      categories: `${baseUrl}/api/categories`
     }
   });
 });
@@ -193,5 +198,8 @@ app.all('/*splat', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
-  console.log(`Admin panel endpoints available at http://localhost:${PORT}/api/admin/`);
+  const baseUrl = process.env.NODE_ENV === 'production' 
+    ? 'https://expense-tracker-backend-henna.vercel.app'
+    : `http://localhost:${PORT}`;
+  console.log(`Admin panel endpoints available at ${baseUrl}/api/admin/`);
 });
