@@ -29,9 +29,8 @@ mongoose.connect(process.env.MONGO_URI)
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? (process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [
-        'https://expense-tracker-backend-henna.vercel.app',
-        'https://your-admin-panel.vercel.app',
-        // 'https://your-frontend.vercel.app'
+        'https://expense-tracker-rot7.onrender.com',
+        'https://your-frontend.vercel.app'
       ])
     : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'http://127.0.0.1:5173'],
   credentials: true,
@@ -61,7 +60,7 @@ app.use('/api/categories', categoryRoutes);
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   const baseUrl = process.env.NODE_ENV === 'production' 
-    ? 'https://expense-tracker-backend-henna.vercel.app'
+    ? 'https://expense-tracker-rot7.onrender.com'
     : `http://localhost:${PORT}`;
     
   res.json({ 
@@ -199,7 +198,7 @@ app.all('/*splat', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   const baseUrl = process.env.NODE_ENV === 'production' 
-    ? 'https://expense-tracker-backend-henna.vercel.app'
+    ? 'https://expense-tracker-rot7.onrender.com'
     : `http://localhost:${PORT}`;
   console.log(`Admin panel endpoints available at ${baseUrl}/api/admin/`);
 });

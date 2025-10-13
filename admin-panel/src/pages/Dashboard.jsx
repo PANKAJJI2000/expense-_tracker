@@ -5,7 +5,10 @@ import {
   CardContent,
   Typography,
   Box,
-  Paper
+  Paper,
+  List,
+  ListItem,
+  ListItemText
 } from '@mui/material'
 import {
   TrendingUp,
@@ -13,19 +16,6 @@ import {
   Receipt,
   AttachMoney
 } from '@mui/icons-material'
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer
-} from 'recharts'
 import api from '../config/api'
 
 const StatCard = ({ title, value, icon, color }) => (
@@ -55,8 +45,7 @@ const Dashboard = () => {
     totalAmount: 0,
     monthlyGrowth: 0
   })
-  const [chartData, setChartData] = useState([])
-  const [pieData, setPieData] = useState([])
+  const [recentExpenses, setRecentExpenses] = useState([])
 
   useEffect(() => {
     fetchDashboardData()
@@ -64,21 +53,17 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [statsRes, chartRes, pieRes] = await Promise.all([
+      const [statsRes, expensesRes] = await Promise.all([
         api.get('/admin/stats'),
-        api.get('/admin/monthly-expenses'),
-        api.get('/admin/category-breakdown')
+        api.get('/admin/recent-expenses')
       ])
       
       setStats(statsRes.data)
-      setChartData(chartRes.data)
-      setPieData(pieRes.data)
+      setRecentExpenses(expensesRes.data)
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error)
     }
   }
-
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8']
 
   return (
     <Box>
@@ -122,53 +107,26 @@ const Dashboard = () => {
       </Grid>
 
       <Grid container spacing={3}>
-        <Grid item xs={12} md={8}>
+        <Grid item xs={12}>
           <Paper sx={{ p: 2 }}>
             <Typography variant="h6" gutterBottom>
-              Monthly Expenses Trend
+              Recent Expenses
             </Typography>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="amount"
-                  stroke="#1976d2"
-                  strokeWidth={2}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </Paper>
-        </Grid>
-        
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Expenses by Category
-            </Typography>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+            <List>
+              {recentExpenses.map((expense, index) => (
+                <ListItem key={expense._id || index}>
+                  <ListItemText
+                    primary={expense.description || 'No description'}
+                    secondary={`$${expense.amount?.toFixed(2)} - ${expense.category} - ${expense.userEmail}`}
+                  />
+                </ListItem>
+              ))}
+              {recentExpenses.length === 0 && (
+                <ListItem>
+                  <ListItemText primary="No recent expenses found" />
+                </ListItem>
+              )}
+            </List>
           </Paper>
         </Grid>
       </Grid>
