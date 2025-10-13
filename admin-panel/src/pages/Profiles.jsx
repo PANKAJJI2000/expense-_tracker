@@ -5,9 +5,16 @@ import {
   Paper,
   IconButton,
   TextField,
-  Grid
+  Grid,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Pagination,
+  CircularProgress
 } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
 import { Edit, Delete, Visibility } from '@mui/icons-material'
 import api from '../config/api'
 
@@ -15,6 +22,8 @@ const Profiles = () => {
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [page, setPage] = useState(1)
+  const [rowsPerPage] = useState(10)
 
   useEffect(() => {
     fetchProfiles()
@@ -45,43 +54,12 @@ const Profiles = () => {
     }
   }
 
-  const columns = [
-    { field: '_id', headerName: 'ID', width: 220 },
-    { field: 'firstName', headerName: 'First Name', width: 150 },
-    { field: 'lastName', headerName: 'Last Name', width: 150 },
-    { field: 'phone', headerName: 'Phone', width: 150 },
-    { field: 'userEmail', headerName: 'User Email', width: 200 },
-    {
-      field: 'dateOfBirth',
-      headerName: 'Date of Birth',
-      width: 150,
-      valueFormatter: (params) => params.value ? new Date(params.value).toLocaleDateString() : '',
-    },
-    {
-      field: 'createdAt',
-      headerName: 'Created',
-      width: 180,
-      valueFormatter: (params) => new Date(params.value).toLocaleDateString(),
-    },
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      width: 120,
-      renderCell: (params) => (
-        <Box>
-          <IconButton size="small">
-            <Visibility />
-          </IconButton>
-          <IconButton size="small">
-            <Edit />
-          </IconButton>
-          <IconButton onClick={() => handleDelete(params.row._id)} size="small">
-            <Delete />
-          </IconButton>
-        </Box>
-      ),
-    },
-  ]
+  const paginatedProfiles = profiles.slice(
+    (page - 1) * rowsPerPage,
+    page * rowsPerPage
+  )
+
+  const totalPages = Math.ceil(profiles.length / rowsPerPage)
 
   return (
     <Box>
@@ -100,19 +78,72 @@ const Profiles = () => {
         </Grid>
       </Grid>
 
-      <Paper sx={{ height: 600, width: '100%' }}>
-        <DataGrid
-          rows={profiles}
-          columns={columns}
-          getRowId={(row) => row._id}
-          loading={loading}
-          pageSizeOptions={[5, 10, 25]}
-          initialState={{
-            pagination: {
-              paginationModel: { page: 0, pageSize: 10 },
-            },
-          }}
-        />
+      <Paper sx={{ width: '100%', mb: 2 }}>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>ID</TableCell>
+                <TableCell>First Name</TableCell>
+                <TableCell>Last Name</TableCell>
+                <TableCell>Phone</TableCell>
+                <TableCell>User Email</TableCell>
+                <TableCell>Date of Birth</TableCell>
+                <TableCell>Created</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={8} align="center">
+                    <CircularProgress />
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedProfiles.map((profile) => (
+                  <TableRow key={profile._id}>
+                    <TableCell sx={{ fontSize: '0.75rem', maxWidth: 120 }}>
+                      {profile._id}
+                    </TableCell>
+                    <TableCell>{profile.firstName}</TableCell>
+                    <TableCell>{profile.lastName}</TableCell>
+                    <TableCell>{profile.phone}</TableCell>
+                    <TableCell>{profile.userEmail}</TableCell>
+                    <TableCell>
+                      {profile.dateOfBirth ? new Date(profile.dateOfBirth).toLocaleDateString() : ''}
+                    </TableCell>
+                    <TableCell>
+                      {new Date(profile.createdAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <Box>
+                        <IconButton size="small">
+                          <Visibility />
+                        </IconButton>
+                        <IconButton size="small">
+                          <Edit />
+                        </IconButton>
+                        <IconButton onClick={() => handleDelete(profile._id)} size="small">
+                          <Delete />
+                        </IconButton>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+          <Pagination
+            count={totalPages}
+            page={page}
+            onChange={(event, newPage) => setPage(newPage)}
+            color="primary"
+          />
+        </Box>
       </Paper>
     </Box>
   )

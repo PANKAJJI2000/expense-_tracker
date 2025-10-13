@@ -10,9 +10,16 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Chip
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Pagination,
+  CircularProgress
 } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
 import { Edit, Delete, Add } from '@mui/icons-material'
 import api from '../config/api'
 
@@ -26,6 +33,8 @@ const Users = () => {
     email: '',
     status: 'active'
   })
+  const [page, setPage] = useState(1)
+  const [rowsPerPage] = useState(10)
 
   useEffect(() => {
     fetchUsers()
@@ -79,44 +88,12 @@ const Users = () => {
     }
   }
 
-  const columns = [
-    { field: '_id', headerName: 'ID', width: 220 },
-    { field: 'name', headerName: 'Name', width: 200 },
-    { field: 'email', headerName: 'Email', width: 250 },
-    {
-      field: 'status',
-      headerName: 'Status',
-      width: 120,
-      renderCell: (params) => (
-        <Chip
-          label={params.value}
-          color={params.value === 'active' ? 'success' : 'default'}
-          size="small"
-        />
-      ),
-    },
-    {
-      field: 'createdAt',
-      headerName: 'Created',
-      width: 180,
-      valueFormatter: (params) => new Date(params.value).toLocaleDateString(),
-    },
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      width: 120,
-      renderCell: (params) => (
-        <Box>
-          <IconButton onClick={() => handleEdit(params.row)} size="small">
-            <Edit />
-          </IconButton>
-          <IconButton onClick={() => handleDelete(params.row._id)} size="small">
-            <Delete />
-          </IconButton>
-        </Box>
-      ),
-    },
-  ]
+  const paginatedUsers = users.slice(
+    (page - 1) * rowsPerPage,
+    page * rowsPerPage
+  )
+
+  const totalPages = Math.ceil(users.length / rowsPerPage)
 
   return (
     <Box>
@@ -131,19 +108,69 @@ const Users = () => {
         </Button>
       </Box>
 
-      <Paper sx={{ height: 600, width: '100%' }}>
-        <DataGrid
-          rows={users}
-          columns={columns}
-          getRowId={(row) => row._id}
-          loading={loading}
-          pageSizeOptions={[5, 10, 25]}
-          initialState={{
-            pagination: {
-              paginationModel: { page: 0, pageSize: 10 },
-            },
-          }}
-        />
+      <Paper sx={{ width: '100%', mb: 2 }}>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>ID</TableCell>
+                <TableCell>Name</TableCell>
+                <TableCell>Email</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Created</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center">
+                    <CircularProgress />
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedUsers.map((user) => (
+                  <TableRow key={user._id}>
+                    <TableCell sx={{ fontSize: '0.75rem', maxWidth: 120 }}>
+                      {user._id}
+                    </TableCell>
+                    <TableCell>{user.name}</TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={user.status}
+                        color={user.status === 'active' ? 'success' : 'default'}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {new Date(user.createdAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <Box>
+                        <IconButton onClick={() => handleEdit(user)} size="small">
+                          <Edit />
+                        </IconButton>
+                        <IconButton onClick={() => handleDelete(user._id)} size="small">
+                          <Delete />
+                        </IconButton>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+          <Pagination
+            count={totalPages}
+            page={page}
+            onChange={(event, newPage) => setPage(newPage)}
+            color="primary"
+          />
+        </Box>
       </Paper>
 
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>

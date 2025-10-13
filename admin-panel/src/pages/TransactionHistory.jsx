@@ -6,9 +6,16 @@ import {
   IconButton,
   TextField,
   Grid,
-  Chip
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Pagination,
+  CircularProgress
 } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
 import { Delete, Visibility } from '@mui/icons-material'
 import api from '../config/api'
 
@@ -20,6 +27,8 @@ const TransactionHistory = () => {
     start: '',
     end: ''
   })
+  const [page, setPage] = useState(1)
+  const [rowsPerPage] = useState(10)
 
   useEffect(() => {
     fetchHistory()
@@ -52,39 +61,12 @@ const TransactionHistory = () => {
     }
   }
 
-  const columns = [
-    { field: '_id', headerName: 'ID', width: 220 },
-    { field: 'action', headerName: 'Action', width: 150 },
-    { field: 'description', headerName: 'Description', width: 250 },
-    { field: 'userEmail', headerName: 'User', width: 200 },
-    {
-      field: 'transactionId',
-      headerName: 'Transaction ID',
-      width: 200,
-      valueGetter: (params) => params.row.transactionId?._id || 'N/A',
-    },
-    {
-      field: 'createdAt',
-      headerName: 'Date',
-      width: 180,
-      valueFormatter: (params) => new Date(params.value).toLocaleString(),
-    },
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      width: 120,
-      renderCell: (params) => (
-        <Box>
-          <IconButton size="small">
-            <Visibility />
-          </IconButton>
-          <IconButton onClick={() => handleDelete(params.row._id)} size="small">
-            <Delete />
-          </IconButton>
-        </Box>
-      ),
-    },
-  ]
+  const paginatedHistory = history.slice(
+    (page - 1) * rowsPerPage,
+    page * rowsPerPage
+  )
+
+  const totalPages = Math.ceil(history.length / rowsPerPage)
 
   return (
     <Box>
@@ -123,19 +105,67 @@ const TransactionHistory = () => {
         </Grid>
       </Grid>
 
-      <Paper sx={{ height: 600, width: '100%' }}>
-        <DataGrid
-          rows={history}
-          columns={columns}
-          getRowId={(row) => row._id}
-          loading={loading}
-          pageSizeOptions={[5, 10, 25]}
-          initialState={{
-            pagination: {
-              paginationModel: { page: 0, pageSize: 10 },
-            },
-          }}
-        />
+      <Paper sx={{ width: '100%', mb: 2 }}>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>ID</TableCell>
+                <TableCell>Action</TableCell>
+                <TableCell>Description</TableCell>
+                <TableCell>User</TableCell>
+                <TableCell>Transaction ID</TableCell>
+                <TableCell>Date</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center">
+                    <CircularProgress />
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedHistory.map((item) => (
+                  <TableRow key={item._id}>
+                    <TableCell sx={{ fontSize: '0.75rem', maxWidth: 120 }}>
+                      {item._id}
+                    </TableCell>
+                    <TableCell>{item.action}</TableCell>
+                    <TableCell>{item.description}</TableCell>
+                    <TableCell>{item.userEmail}</TableCell>
+                    <TableCell sx={{ fontSize: '0.75rem', maxWidth: 120 }}>
+                      {item.transactionId?._id || 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      {new Date(item.createdAt).toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      <Box>
+                        <IconButton size="small">
+                          <Visibility />
+                        </IconButton>
+                        <IconButton onClick={() => handleDelete(item._id)} size="small">
+                          <Delete />
+                        </IconButton>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+          <Pagination
+            count={totalPages}
+            page={page}
+            onChange={(event, newPage) => setPage(newPage)}
+            color="primary"
+          />
+        </Box>
       </Paper>
     </Box>
   )

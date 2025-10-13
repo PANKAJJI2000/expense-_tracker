@@ -10,9 +10,16 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Pagination,
+  CircularProgress
 } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
 import { Edit, Delete, Visibility } from '@mui/icons-material'
 import api from '../config/api'
 
@@ -25,6 +32,8 @@ const Transactions = () => {
     start: '',
     end: ''
   })
+  const [page, setPage] = useState(1)
+  const [rowsPerPage] = useState(10)
 
   useEffect(() => {
     fetchTransactions()
@@ -58,66 +67,12 @@ const Transactions = () => {
     }
   }
 
-  const columns = [
-    { field: '_id', headerName: 'ID', width: 220 },
-    { field: 'description', headerName: 'Description', width: 200 },
-    {
-      field: 'amount',
-      headerName: 'Amount',
-      width: 120,
-      valueFormatter: (params) => `$${params.value?.toFixed(2)}`,
-    },
-    {
-      field: 'type',
-      headerName: 'Type',
-      width: 120,
-      renderCell: (params) => (
-        <Chip
-          label={params.value}
-          color={params.value === 'income' ? 'success' : 'error'}
-          size="small"
-        />
-      ),
-    },
-    { field: 'reference', headerName: 'Reference', width: 150 },
-    { field: 'userEmail', headerName: 'User', width: 200 },
-    {
-      field: 'date',
-      headerName: 'Date',
-      width: 120,
-      valueFormatter: (params) => params.value ? new Date(params.value).toLocaleDateString() : '',
-    },
-    {
-      field: 'status',
-      headerName: 'Status',
-      width: 120,
-      renderCell: (params) => (
-        <Chip
-          label={params.value || 'pending'}
-          color={params.value === 'completed' ? 'success' : 'warning'}
-          size="small"
-        />
-      ),
-    },
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      width: 120,
-      renderCell: (params) => (
-        <Box>
-          <IconButton size="small">
-            <Visibility />
-          </IconButton>
-          <IconButton size="small">
-            <Edit />
-          </IconButton>
-          <IconButton onClick={() => handleDelete(params.row._id)} size="small">
-            <Delete />
-          </IconButton>
-        </Box>
-      ),
-    },
-  ]
+  const paginatedTransactions = transactions.slice(
+    (page - 1) * rowsPerPage,
+    page * rowsPerPage
+  )
+
+  const totalPages = Math.ceil(transactions.length / rowsPerPage)
 
   return (
     <Box>
@@ -169,19 +124,84 @@ const Transactions = () => {
         </Grid>
       </Grid>
 
-      <Paper sx={{ height: 600, width: '100%' }}>
-        <DataGrid
-          rows={transactions}
-          columns={columns}
-          getRowId={(row) => row._id}
-          loading={loading}
-          pageSizeOptions={[5, 10, 25]}
-          initialState={{
-            pagination: {
-              paginationModel: { page: 0, pageSize: 10 },
-            },
-          }}
-        />
+      <Paper sx={{ width: '100%', mb: 2 }}>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>ID</TableCell>
+                <TableCell>Description</TableCell>
+                <TableCell>Amount</TableCell>
+                <TableCell>Type</TableCell>
+                <TableCell>Reference</TableCell>
+                <TableCell>User</TableCell>
+                <TableCell>Date</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={9} align="center">
+                    <CircularProgress />
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedTransactions.map((transaction) => (
+                  <TableRow key={transaction._id}>
+                    <TableCell sx={{ fontSize: '0.75rem', maxWidth: 120 }}>
+                      {transaction._id}
+                    </TableCell>
+                    <TableCell>{transaction.description}</TableCell>
+                    <TableCell>${transaction.amount?.toFixed(2)}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={transaction.type}
+                        color={transaction.type === 'income' ? 'success' : 'error'}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>{transaction.reference}</TableCell>
+                    <TableCell>{transaction.userEmail}</TableCell>
+                    <TableCell>
+                      {transaction.date ? new Date(transaction.date).toLocaleDateString() : ''}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={transaction.status || 'pending'}
+                        color={transaction.status === 'completed' ? 'success' : 'warning'}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Box>
+                        <IconButton size="small">
+                          <Visibility />
+                        </IconButton>
+                        <IconButton size="small">
+                          <Edit />
+                        </IconButton>
+                        <IconButton onClick={() => handleDelete(transaction._id)} size="small">
+                          <Delete />
+                        </IconButton>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+          <Pagination
+            count={totalPages}
+            page={page}
+            onChange={(event, newPage) => setPage(newPage)}
+            color="primary"
+          />
+        </Box>
       </Paper>
     </Box>
   )

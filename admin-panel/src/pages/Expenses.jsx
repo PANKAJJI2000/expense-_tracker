@@ -6,9 +6,16 @@ import {
   IconButton,
   Chip,
   TextField,
-  Grid
+  Grid,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Pagination,
+  CircularProgress
 } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
 import { Edit, Delete, Visibility } from '@mui/icons-material'
 import api from '../config/api'
 
@@ -20,6 +27,8 @@ const Expenses = () => {
     start: '',
     end: ''
   })
+  const [page, setPage] = useState(1)
+  const [rowsPerPage] = useState(10)
 
   useEffect(() => {
     fetchExpenses()
@@ -52,54 +61,12 @@ const Expenses = () => {
     }
   }
 
-  const columns = [
-    { field: '_id', headerName: 'ID', width: 220 },
-    { field: 'description', headerName: 'Description', width: 200 },
-    {
-      field: 'amount',
-      headerName: 'Amount',
-      width: 120,
-      valueFormatter: (params) => `$${params.value.toFixed(2)}`,
-    },
-    { field: 'category', headerName: 'Category', width: 150 },
-    { field: 'userEmail', headerName: 'User', width: 200 },
-    {
-      field: 'date',
-      headerName: 'Date',
-      width: 120,
-      valueFormatter: (params) => new Date(params.value).toLocaleDateString(),
-    },
-    {
-      field: 'status',
-      headerName: 'Status',
-      width: 120,
-      renderCell: (params) => (
-        <Chip
-          label={params.value}
-          color={params.value === 'approved' ? 'success' : 'warning'}
-          size="small"
-        />
-      ),
-    },
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      width: 120,
-      renderCell: (params) => (
-        <Box>
-          <IconButton size="small">
-            <Visibility />
-          </IconButton>
-          <IconButton size="small">
-            <Edit />
-          </IconButton>
-          <IconButton onClick={() => handleDelete(params.row._id)} size="small">
-            <Delete />
-          </IconButton>
-        </Box>
-      ),
-    },
-  ]
+  const paginatedExpenses = expenses.slice(
+    (page - 1) * rowsPerPage,
+    page * rowsPerPage
+  )
+
+  const totalPages = Math.ceil(expenses.length / rowsPerPage)
 
   return (
     <Box>
@@ -138,19 +105,76 @@ const Expenses = () => {
         </Grid>
       </Grid>
 
-      <Paper sx={{ height: 600, width: '100%' }}>
-        <DataGrid
-          rows={expenses}
-          columns={columns}
-          getRowId={(row) => row._id}
-          loading={loading}
-          pageSizeOptions={[5, 10, 25]}
-          initialState={{
-            pagination: {
-              paginationModel: { page: 0, pageSize: 10 },
-            },
-          }}
-        />
+      <Paper sx={{ width: '100%', mb: 2 }}>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>ID</TableCell>
+                <TableCell>Description</TableCell>
+                <TableCell>Amount</TableCell>
+                <TableCell>Category</TableCell>
+                <TableCell>User</TableCell>
+                <TableCell>Date</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={8} align="center">
+                    <CircularProgress />
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedExpenses.map((expense) => (
+                  <TableRow key={expense._id}>
+                    <TableCell sx={{ fontSize: '0.75rem', maxWidth: 120 }}>
+                      {expense._id}
+                    </TableCell>
+                    <TableCell>{expense.description}</TableCell>
+                    <TableCell>${expense.amount.toFixed(2)}</TableCell>
+                    <TableCell>{expense.category}</TableCell>
+                    <TableCell>{expense.userEmail}</TableCell>
+                    <TableCell>
+                      {new Date(expense.date).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={expense.status}
+                        color={expense.status === 'approved' ? 'success' : 'warning'}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Box>
+                        <IconButton size="small">
+                          <Visibility />
+                        </IconButton>
+                        <IconButton size="small">
+                          <Edit />
+                        </IconButton>
+                        <IconButton onClick={() => handleDelete(expense._id)} size="small">
+                          <Delete />
+                        </IconButton>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+          <Pagination
+            count={totalPages}
+            page={page}
+            onChange={(event, newPage) => setPage(newPage)}
+            color="primary"
+          />
+        </Box>
       </Paper>
     </Box>
   )
