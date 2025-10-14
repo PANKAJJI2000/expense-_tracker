@@ -189,8 +189,39 @@ app.get('/api/admin/debug-transaction-history', async (req, res) => {
   }
 });
 
-// 404 handler
-app.all('/*splat', (req, res) => {
+// Root route for localhost web page
+app.get('/', (req, res) => {
+  const baseUrl = process.env.NODE_ENV === 'production' 
+    ? 'https://expense-tracker-rot7.onrender.com'
+    : `http://localhost:${PORT}`;
+    
+  res.json({
+    message: 'Expense Tracker API Server',
+    status: 'Running',
+    version: process.env.API_VERSION || 'v1',
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: `${baseUrl}/api/health`,
+      auth: `${baseUrl}/api/auth`,
+      expenses: `${baseUrl}/api/expenses`,
+      profiles: `${baseUrl}/api/profiles`,
+      transactions: `${baseUrl}/api/transactions`,
+      transactionHistory: `${baseUrl}/api/transaction-history`,
+      autoExpenses: `${baseUrl}/api/auto-expenses`,
+      admin: `${baseUrl}/api/admin`,
+      categories: `${baseUrl}/api/categories`
+    }
+  });
+});
+
+app.get('/api', (req, res) => {
+  res.send("Expense Tracker API is running");
+  // res.redirect('/');
+});
+
+// 404 handler - must be last
+app.all('*', (req, res) => {
   console.log(`404 - Route not found: ${req.method} ${req.path}`);
   res.status(404).json({ error: 'Route not found' });
 });
