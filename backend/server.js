@@ -16,22 +16,22 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Trust proxy for deployment platforms
+// Trust proxy for deployment platforms (needed for HTTPS redirects)
 app.set('trust proxy', 1);
 
-
-// MongoDB Connection
+// MongoDB Connection using environment variable
 mongoose.connect(process.env.MONGO_URI)
 .then(() => console.log('MongoDB Connected Successfully'))
 .catch((err) => console.error('MongoDB Connection Error:', err));
 
-// Middleware
+// CORS Middleware Configuration
+// This controls which frontend URLs can access the backend API
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? (process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [
-        'https://expense-tracker-rot7.onrender.com', // Add your deployed admin panel URL
+        'https://expense-tracker-rot7.onrender.com', // Production admin panel URL - UPDATE THIS to match your deployed admin panel
       ])
-    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'http://127.0.0.1:5173'],
+    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'http://127.0.0.1:5173'], // Local development URLs for admin panel
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -47,21 +47,22 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes
+// API Routes - All admin panel requests will use these endpoints
 app.use('/api/auth', authRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/profiles', profileRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/transaction-history', transactionHistoryRoutes);
 app.use('/api/auto-expenses', autoExpenseRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/admin', adminRoutes); // Admin panel specific routes
 app.use('/api/categories', categoryRoutes);
 
-// Health check endpoint
+// Health check endpoint - Used by admin panel to verify backend connectivity
 app.get('/api/health', (req, res) => {
+  // Backend URL configuration - This is what the admin panel will connect to
   const baseUrl = process.env.NODE_ENV === 'production' 
-    ? 'https://expense-tracker-rot7.onrender.com'
-    : `http://localhost:${PORT}`;
+    ? 'https://expense-tracker-backend-48vm.onrender.com/' // Production backend URL
+    : `http://localhost:${PORT}`; // Development backend URL
     
   res.json({ 
     status: 'Server running',
@@ -77,7 +78,7 @@ app.get('/api/health', (req, res) => {
       transactions: `${baseUrl}/api/transactions`,
       transactionHistory: `${baseUrl}/api/transaction-history`,
       autoExpenses: `${baseUrl}/api/auto-expenses`,
-      admin: `${baseUrl}/api/admin`,
+      admin: `${baseUrl}/api/admin`, // Admin panel will use this endpoint
       categories: `${baseUrl}/api/categories`
     }
   });
@@ -189,11 +190,12 @@ app.get('/api/admin/debug-transaction-history', async (req, res) => {
   }
 });
 
-// Root route for localhost web page
+// Root route - Shows API information when visiting backend URL directly
 app.get('/', (req, res) => {
+  // Backend URL that admin panel connects to
   const baseUrl = process.env.NODE_ENV === 'production' 
-    ? 'https://expense-tracker-rot7.onrender.com'
-    : `http://localhost:${PORT}`;
+    ? 'https://expense-tracker-rot7.onrender.com' // Production backend URL
+    : `http://localhost:${PORT}`; // Development backend URL
     
   res.json({
     message: 'Expense Tracker API Server',
@@ -209,12 +211,13 @@ app.get('/', (req, res) => {
       transactions: `${baseUrl}/api/transactions`,
       transactionHistory: `${baseUrl}/api/transaction-history`,
       autoExpenses: `${baseUrl}/api/auto-expenses`,
-      admin: `${baseUrl}/api/admin`,
+      admin: `${baseUrl}/api/admin`, // Admin panel connects here
       categories: `${baseUrl}/api/categories`
     }
   });
 });
 
+// Simple API status endpoint
 app.get('/api', (req, res) => {
   res.send("Expense Tracker API is running");
   // res.redirect('/');
@@ -228,8 +231,10 @@ app.all('*', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  // Backend URL that admin panel will connect to
   const baseUrl = process.env.NODE_ENV === 'production' 
-    ? 'https://expense-tracker-rot7.onrender.com'
-    : `http://localhost:${PORT}`;
+    ? 'https://expense-tracker-rot7.onrender.com' // Production backend URL
+    : `http://localhost:${PORT}`; // Development backend URL
   console.log(`Admin panel endpoints available at ${baseUrl}/api/admin/`);
+  console.log(`Admin panel should connect to: ${baseUrl}`);
 });
