@@ -38,6 +38,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
+      console.log(api.defaults.baseURL)
       console.log('Attempting login to:', `${api.defaults.baseURL}/admin/login`)
       console.log('API base URL:', api.defaults.baseURL)
       
