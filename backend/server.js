@@ -31,7 +31,7 @@ app.use(cors({
     ? (process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [
         'https://expense-tracker-rot7.onrender.com', // Production admin panel URL - UPDATE THIS to match your deployed admin panel
       ])
-    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'http://127.0.0.1:5173'], // Local development URLs for admin panel
+    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'http://127.0.0.1:5173',"https://expense-tracker-rot7.onrender.com"], // Local development URLs for admin panel
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
