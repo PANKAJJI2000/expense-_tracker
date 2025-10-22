@@ -3,10 +3,11 @@ import axios from 'axios'
 // API Configuration
 // Backend server runs on port 3000 in development
 // Production URL should match your deployed backend server
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://expense-tracker-backend-48vm.onrender.com/api'  // Production backend URL
-  : 'http://localhost:3000/api'  // Local development backend URL
-
+// const API_BASE_URL = process.env.NODE_ENV === 'production' 
+//   ? 'https://expense-tracker-backend-48vm.onrender.com/api'  // Production backend URL
+//   : 'http://localhost:3000/api'  // Local development backend URL
+const API_BASE_URL =  'https://expense-tracker-backend-48vm.onrender.com/api'  // Production backend URL
+  
 // Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
