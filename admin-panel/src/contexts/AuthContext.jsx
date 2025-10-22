@@ -31,7 +31,7 @@ export const AuthProvider = ({ children }) => {
       setUser(response.data.user)
     } catch (error) {
       localStorage.removeItem('adminToken')
-    } finally {
+    } finally {p
       setLoading(false)
     }
   }
