@@ -2,6 +2,8 @@ require('dotenv').config({ quiet: true });
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const session = require('express-session');
+const MongoStore = require('connect-mongo');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -24,15 +26,35 @@ mongoose.connect(process.env.MONGO_URI)
 .then(() => console.log('MongoDB Connected Successfully'))
 .catch((err) => console.error('MongoDB Connection Error:', err));
 
+// Session configuration - Must be before CORS and routes
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  store: MongoStore.create({
+    mongoUrl: process.env.MONGO_URI,
+    collectionName: 'sessions',
+    ttl: 24 * 60 * 60, // 1 day in seconds
+    autoRemove: 'native',
+    touchAfter: 24 * 3600 // Lazy session update
+  }),
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 1 day in milliseconds
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+  },
+  name: 'sessionId' // Custom session cookie name
+}));
+
 // CORS Middleware Configuration
-// This controls which frontend URLs can access the backend API
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? (process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [
-        'https://expense-tracker-rot7.onrender.com', // Production admin panel URL - UPDATE THIS to match your deployed admin panel
+        'https://expense-tracker-rot7.onrender.com',
       ])
-    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'http://127.0.0.1:5173',"https://expense-tracker-rot7.onrender.com"], // Local development URLs for admin panel
-  credentials: true,
+    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'http://127.0.0.1:5173',"https://expense-tracker-rot7.onrender.com"],
+  credentials: true, // Important for sessions
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   optionsSuccessStatus: 200
@@ -41,9 +63,18 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Request logging middleware for debugging
+// Request logging middleware with session info
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  const sessionInfo = req.session?.user ? `User: ${req.session.user.email}` : 'No session';
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path} - SessionID: ${req.sessionID} - ${sessionInfo}`);
+  next();
+});
+
+// Session activity tracking middleware
+app.use((req, res, next) => {
+  if (req.session && req.session.user) {
+    req.session.lastActivity = new Date();
+  }
   next();
 });
 
@@ -57,12 +88,11 @@ app.use('/api/auto-expenses', autoExpenseRoutes);
 app.use('/api/admin', adminRoutes); // Admin panel specific routes
 app.use('/api/categories', categoryRoutes);
 
-// Health check endpoint - Used by admin panel to verify backend connectivity
+// Health check endpoint - Enhanced with session info
 app.get('/api/health', (req, res) => {
-  // Backend URL configuration - This is what the admin panel will connect to
   const baseUrl = process.env.NODE_ENV === 'production' 
-    ? 'https://expense-tracker-backend-48vm.onrender.com/' // Production backend URL
-    : `http://localhost:${PORT}`; // Development backend URL
+    ? 'https://expense-tracker-backend-48vm.onrender.com/'
+    : `http://localhost:${PORT}`;
     
   res.json({ 
     status: 'Server running',
@@ -71,6 +101,8 @@ app.get('/api/health', (req, res) => {
     version: process.env.API_VERSION || 'v1',
     timestamp: new Date().toISOString(),
     baseUrl: baseUrl,
+    sessionActive: !!req.session?.user,
+    sessionId: req.sessionID,
     routes: {
       auth: `${baseUrl}/api/auth`,
       expenses: `${baseUrl}/api/expenses`,
@@ -78,8 +110,10 @@ app.get('/api/health', (req, res) => {
       transactions: `${baseUrl}/api/transactions`,
       transactionHistory: `${baseUrl}/api/transaction-history`,
       autoExpenses: `${baseUrl}/api/auto-expenses`,
-      admin: `${baseUrl}/api/admin`, // Admin panel will use this endpoint
-      categories: `${baseUrl}/api/categories`
+      admin: `${baseUrl}/api/admin`,
+      categories: `${baseUrl}/api/categories`,
+      adminSessions: `${baseUrl}/api/admin/sessions`, // Added session management
+      sessionStats: `${baseUrl}/api/admin/sessions/stats` // Added session stats
     }
   });
 });
@@ -192,10 +226,9 @@ app.get('/api/admin/debug-transaction-history', async (req, res) => {
 
 // Root route - Shows API information when visiting backend URL directly
 app.get('/', (req, res) => {
-  // Backend URL that admin panel connects to
   const baseUrl = process.env.NODE_ENV === 'production' 
-    ? 'https://expense-tracker-rot7.onrender.com' // Production backend URL
-    : `http://localhost:${PORT}`; // Development backend URL
+    ? 'https://expense-tracker-rot7.onrender.com'
+    : `http://localhost:${PORT}`;
     
   res.json({
     message: 'Expense Tracker API Server',
@@ -211,8 +244,10 @@ app.get('/', (req, res) => {
       transactions: `${baseUrl}/api/transactions`,
       transactionHistory: `${baseUrl}/api/transaction-history`,
       autoExpenses: `${baseUrl}/api/auto-expenses`,
-      admin: `${baseUrl}/api/admin`, // Admin panel connects here
-      categories: `${baseUrl}/api/categories`
+      admin: `${baseUrl}/api/admin`,
+      categories: `${baseUrl}/api/categories`,
+      adminSessions: `${baseUrl}/api/admin/sessions`, // Added
+      sessionStats: `${baseUrl}/api/admin/sessions/stats` // Added
     }
   });
 });
@@ -221,6 +256,47 @@ app.get('/', (req, res) => {
 app.get('/api', (req, res) => {
   res.send("Expense Tracker API is running");
   // res.redirect('/');
+});
+
+// Session info endpoint
+app.get('/api/session/info', (req, res) => {
+  if (!req.session || !req.session.user) {
+    return res.json({
+      authenticated: false,
+      sessionId: req.sessionID,
+      message: 'No active session'
+    });
+  }
+
+  res.json({
+    authenticated: true,
+    sessionId: req.sessionID,
+    user: {
+      id: req.session.user.id,
+      email: req.session.user.email,
+      role: req.session.user.role
+    },
+    lastActivity: req.session.lastActivity,
+    cookie: {
+      maxAge: req.session.cookie.maxAge,
+      expires: req.session.cookie.expires
+    }
+  });
+});
+
+// Destroy session endpoint
+app.post('/api/session/destroy', (req, res) => {
+  if (req.session) {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ error: 'Failed to destroy session' });
+      }
+      res.clearCookie('sessionId');
+      res.json({ message: 'Session destroyed successfully' });
+    });
+  } else {
+    res.json({ message: 'No active session' });
+  }
 });
 
 // 404 handler - must be last

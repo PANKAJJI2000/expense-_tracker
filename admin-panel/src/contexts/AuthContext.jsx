@@ -31,7 +31,7 @@ export const AuthProvider = ({ children }) => {
       setUser(response.data.user)
     } catch (error) {
       localStorage.removeItem('adminToken')
-    } finally {p
+    } finally {
       setLoading(false)
     }
   }
@@ -42,10 +42,12 @@ export const AuthProvider = ({ children }) => {
       console.log('Attempting login to:', `${api.defaults.baseURL}/admin/login`)
       console.log('API base URL:', api.defaults.baseURL)
       
-      // Test basic connectivity first
-      console.log('Testing server connectivity...')
-      
-      const response = await api.post('/admin/login', { email, password })
+      const response = await api.post('/admin/login', { 
+        email, 
+        password 
+      }, {
+        timeout: 60000 // Increase timeout to 60 seconds
+      })
       const { token, user } = response.data
       
       localStorage.setItem('adminToken', token)
@@ -61,25 +63,21 @@ export const AuthProvider = ({ children }) => {
         baseURL: error.config?.baseURL
       })
       
+      // Handle timeout errors
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        console.error('Request timed out - Backend server may be starting up or database connection is slow')
+        return { 
+          success: false, 
+          error: 'Request timed out. The backend server may be starting up or having database connection issues. Please wait a moment and try again.' 
+        }
+      }
+      
       // Handle network errors
       if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
         console.error('Network error - API server may be unreachable')
-        console.error('Trying to reach:', `${api.defaults.baseURL}/admin/login`)
-        
-        // Test if it's a DNS/connection issue
-        try {
-          const healthCheck = await fetch(`${api.defaults.baseURL}/api/health`, { 
-            method: 'GET',
-            mode: 'cors'
-          })
-          console.log('Health check response:', healthCheck.status)
-        } catch (healthError) {
-          console.error('Health check also failed:', healthError.message)
-        }
-        
         return { 
           success: false, 
-          error: `Unable to connect to server at ${api.defaults.baseURL}. Please check if the API server is running and accessible.` 
+          error: `Unable to connect to server. Please ensure the backend server is running on ${api.defaults.baseURL}` 
         }
       }
       

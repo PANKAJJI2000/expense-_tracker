@@ -1,69 +1,87 @@
 import axios from 'axios'
 
-// API Configuration
-// Backend server runs on port 3000 in development
-// Production URL should match your deployed backend server
-// const API_BASE_URL = process.env.NODE_ENV === 'production' 
-//   ? 'https://expense-tracker-backend-48vm.onrender.com/api'  // Production backend URL
-//   : 'http://localhost:3000/api'  // Local development backend URL
-const API_BASE_URL =  'https://expense-tracker-backend-48vm.onrender.com/api'  // Production backend URL
-  
-// Create axios instance with base configuration
+// Get base URL from environment or use default
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+
+console.log('API Base URL:', BASE_URL)
+
 const api = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 30000, // 30 second timeout for slow network connections
+  baseURL: BASE_URL,
+  timeout: 10000,
   headers: {
-    'Content-Type': 'application/json',
-  },
-  withCredentials: true // Enable cookies for authentication
+    'Content-Type': 'application/json'
+  }
 })
 
-// Request interceptor to add auth token to all requests
+// Request interceptor - Add auth token and log requests
 api.interceptors.request.use(
   (config) => {
-    // Get admin token from localStorage and add to Authorization header
-    const token = localStorage.getItem('adminToken')
+    // Get token from localStorage
+    const token = localStorage.getItem('token') || localStorage.getItem('adminToken')
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
+      console.log('✓ Token added to request:', token.substring(0, 20) + '...')
+    } else {
+      console.warn('⚠ No auth token found in localStorage')
     }
-    // Log request URL for debugging
-    console.log('Making request to:', config.baseURL + config.url)
+    
+    console.log('→ API Request:', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      fullURL: config.baseURL + config.url,
+      headers: config.headers,
+      data: config.data
+    })
+    
     return config
   },
   (error) => {
-    console.error('Request interceptor error:', error)
+    console.error('✗ Request Error:', error)
     return Promise.reject(error)
   }
 )
 
-// Response interceptor for centralized error handling
+// Response interceptor - Log responses and handle errors
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    // Log detailed error information for debugging
-    console.error('API Response Error:', {
-      message: error.message,
-      status: error.response?.status,
-      data: error.response?.data,
-      config: {
-        url: error.config?.url,
-        method: error.config?.method,
-        baseURL: error.config?.baseURL
-      }
+  (response) => {
+    console.log('← API Response:', {
+      status: response.status,
+      url: response.config.url,
+      data: response.data,
+      headers: response.headers
     })
-
-    // Handle authentication errors (401 Unauthorized)
+    return response
+  },
+  (error) => {
+    console.error('✗ API Error:', {
+      message: error.message,
+      url: error.config?.url,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      headers: error.response?.headers
+    })
+    
+    // Handle specific errors
     if (error.response?.status === 401) {
-      // Clear invalid token from localStorage
-      localStorage.removeItem('adminToken')
-      // Redirect to login page if not already there
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
-      }
+      console.warn('⚠ Authentication failed - Token may be invalid or expired')
+      // Optionally redirect to login
+      // window.location.href = '/login'
     }
-
+    
+    if (!error.response) {
+      console.error('✗ Network Error - Cannot reach server at:', BASE_URL)
+      console.error('Possible causes:')
+      console.error('  1. Backend server is not running')
+      console.error('  2. CORS is not configured properly')
+      console.error('  3. Wrong BASE_URL configuration')
+      console.error('  4. Firewall/network blocking the request')
+    }
+    
     return Promise.reject(error)
   }
 )
 
 export default api
+export { BASE_URL }

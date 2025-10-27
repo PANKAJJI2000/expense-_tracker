@@ -30,7 +30,8 @@ import {
   Schedule,
   Person,
   Payment,
-  History
+  History,
+  Lock // Added
 } from '@mui/icons-material'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -45,6 +46,7 @@ const menuItems = [
   { text: 'Profiles', icon: <Person />, path: '/profiles' },
   { text: 'Transactions', icon: <Payment />, path: '/transactions' },
   { text: 'History', icon: <History />, path: '/transaction-history' },
+  { text: 'Sessions', icon: <Lock />, path: '/sessions' }, // Added
 ]
 
 const Layout = () => {
