@@ -578,7 +578,7 @@ const Dashboard = () => {
                     <ListItemText
                       primary={expense.description || 'No description'}
                       secondary={
-                        <Box component="span">
+                        <Box>
                           <Typography component="span" variant="body2" color="primary" fontWeight="bold">
                             ${(expense.amount || 0).toFixed(2)}
                           </Typography>
@@ -602,6 +602,7 @@ const Dashboard = () => {
                           )}
                         </Box>
                       }
+                      secondaryTypographyProps={{ component: 'div' }}
                     />
                   </ListItem>
                 ))
