@@ -11,12 +11,15 @@ const authController = {
       const { name, email, password, phone, gender, currency } = req.body;
       
       if (!email || !password || !name) {
-        return res.status(400).json({ error: 'All fields are required' });
+        return res.status(400).json({ 
+          success: false,
+          error: 'Name, email and password are required' 
+        });
       }
 
       // Check if user already exists
       const existingUser = await User.findOne({
-        $or: [{ email }, { phone }],
+        $or: [{ email }, ...(phone ? [{ phone }] : [])],
       });
 
       if (existingUser) {
@@ -29,15 +32,19 @@ const authController = {
         });
       }
 
-      // Create new user
-      const user = new User({
+      // Create new user with all fields
+      const userData = {
         name,
         email,
         password,
-        phone,
-        gender,
-        currency,
-      });
+      };
+
+      // Only add optional fields if they are provided
+      if (phone) userData.phone = phone;
+      if (gender) userData.gender = gender;
+      if (currency) userData.currency = currency;
+
+      const user = new User(userData);
 
       await user.save();
 
@@ -48,7 +55,7 @@ const authController = {
         { expiresIn: '7d' }
       );
 
-      // Return success response
+      // Return success response with all user data
       res.status(201).json({
         success: true,
         message: "User registered successfully",
@@ -57,9 +64,13 @@ const authController = {
             id: user._id,
             name: user.name,
             email: user.email,
-            phone: user.phone,
-            gender: user.gender,
-            currency: user.currency,
+            phone: user.phone || null,
+            gender: user.gender || null,
+            currency: user.currency || null,
+            profilePicture: user.profilePicture || null,
+            authProvider: user.authProvider || 'local',
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
           },
           token,
         },
@@ -79,11 +90,14 @@ const authController = {
       const { email, password } = req.body;
       
       if (!email || !password) {
-        return res.status(400).json({ error: 'Email and password are required' });
+        return res.status(400).json({ 
+          success: false,
+          error: 'Email and password are required' 
+        });
       }
 
-      // Find user by email
-      const user = await User.findOne({ email });
+      // Find user by email - ensure all fields are fetched
+      const user = await User.findOne({ email }).lean();
       if (!user) {
         return res.status(401).json({
           success: false,
@@ -91,8 +105,11 @@ const authController = {
         });
       }
 
+      // Re-fetch with password for comparison
+      const userWithPassword = await User.findById(user._id).select('+password');
+      
       // Check password
-      const isPasswordValid = await user.comparePassword(password);
+      const isPasswordValid = await userWithPassword.comparePassword(password);
       if (!isPasswordValid) {
         return res.status(401).json({
           success: false,
@@ -115,9 +132,13 @@ const authController = {
             id: user._id,
             name: user.name,
             email: user.email,
-            phone: user.phone,
-            gender: user.gender,
-            currency: user.currency,
+            phone: user.phone || null,
+            gender: user.gender || null,
+            currency: user.currency || null,
+            profilePicture: user.profilePicture || null,
+            authProvider: user.authProvider || 'local',
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
           },
           token,
         },
@@ -390,6 +411,103 @@ const authController = {
 
     } catch (error) {
       console.error("Reset password error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  },
+
+  async getProfile(req, res) {
+    try {
+      // req.userId should be set by authentication middleware
+      const userId = req.userId || req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: "Unauthorized - No user ID found",
+        });
+      }
+
+      // Find user and exclude password
+      const user = await User.findById(userId).select('-password -resetPasswordToken -resetPasswordExpire');
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "User profile retrieved successfully",
+        data: {
+          user: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone || null,
+            gender: user.gender || null,
+            currency: user.currency || null,
+            profilePicture: user.profilePicture || null,
+            authProvider: user.authProvider || 'local',
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
+          }
+        },
+      });
+    } catch (error) {
+      console.error("Get profile error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  },
+
+  async getUserData(req, res) {
+    try {
+      // req.userId should be set by authentication middleware
+      const userId = req.userId || req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: "Unauthorized - No user ID found",
+        });
+      }
+
+      // Find user and get only signup-related data
+      const user = await User.findById(userId).select('name email phone gender currency profilePicture authProvider createdAt');
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "User signup data retrieved successfully",
+        data: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone || null,
+          gender: user.gender || null,
+          currency: user.currency || null,
+          profilePicture: user.profilePicture || null,
+          authProvider: user.authProvider || 'local',
+          createdAt: user.createdAt
+        },
+      });
+    } catch (error) {
+      console.error("Get user data error:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",

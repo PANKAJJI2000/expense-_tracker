@@ -2,9 +2,14 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: [true, 'Name is required'],
+    trim: true
+  },
   email: {
     type: String,
-    required: true,
+    required: [true, 'Email is required'],
     unique: true,
     lowercase: true,
     trim: true
@@ -12,133 +17,118 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: function() {
-      return !this.linkedinId && !this.googleId; // Password not required for social auth users
+      return this.authProvider === 'local';
     },
-    minlength: 6
+    select: false
   },
-  name: {
+  phone: {
     type: String,
-    required: true,
-    trim: true
+    trim: true,
+    default: null
   },
-  // Social authentication fields
-  linkedinId: {
+  gender: {
     type: String,
-    unique: true,
-    sparse: true
+    enum: ['male', 'female', 'other', null],
+    default: null
+  },
+  currency: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  profilePicture: {
+    type: String,
+    default: null
+  },
+  authProvider: {
+    type: String,
+    enum: ['local', 'google', 'linkedin'],
+    default: 'local'
   },
   googleId: {
     type: String,
     unique: true,
     sparse: true
   },
-  profilePicture: {
-    type: String
-  },
-  authProvider: {
+  linkedinId: {
     type: String,
-    enum: ['local', 'linkedin', 'google'],
-    default: 'local'
-  }
+    unique: true,
+    sparse: true
+  },
+  resetPasswordToken: String,
+  resetPasswordExpire: Date
 }, {
   timestamps: true
 });
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 12);
+  if (!this.isModified('password')) {
+    return next();
+  }
+  
+  if (this.password) {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+  }
   next();
 });
 
 // Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.password);
+  return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// LinkedIn signin static method
-userSchema.statics.findOrCreateLinkedInUser = async function(linkedinProfile) {
-  try {
-    // Check if user already exists with LinkedIn ID
-    let user = await this.findOne({ linkedinId: linkedinProfile.id });
+// Find or create Google user
+userSchema.statics.findOrCreateGoogleUser = async function(profile) {
+  let user = await this.findOne({ googleId: profile.id });
+  
+  if (!user) {
+    user = await this.findOne({ email: profile.email });
     
     if (user) {
-      return user;
-    }
-    
-    // Check if user exists with same email
-    user = await this.findOne({ email: linkedinProfile.email });
-    
-    if (user) {
-      // Link LinkedIn account to existing user
-      user.linkedinId = linkedinProfile.id;
-      user.authProvider = 'linkedin';
-      if (linkedinProfile.picture) {
-        user.profilePicture = linkedinProfile.picture;
-      }
-      await user.save();
-      return user;
-    }
-    
-    // Create new user
-    user = new this({
-      email: linkedinProfile.email,
-      name: linkedinProfile.name,
-      linkedinId: linkedinProfile.id,
-      profilePicture: linkedinProfile.picture,
-      authProvider: 'linkedin'
-    });
-    
-    await user.save();
-    return user;
-  } catch (error) {
-    throw new Error('LinkedIn signin error: ' + error.message);
-  }
-};
-
-// Google signin static method
-userSchema.statics.findOrCreateGoogleUser = async function(googleProfile) {
-  try {
-    // Check if user already exists with Google ID
-    let user = await this.findOne({ googleId: googleProfile.id });
-    
-    if (user) {
-      return user;
-    }
-    
-    // Check if user exists with same email
-    user = await this.findOne({ email: googleProfile.email });
-    
-    if (user) {
-      // Link Google account to existing user
-      user.googleId = googleProfile.id;
+      user.googleId = profile.id;
+      user.profilePicture = profile.picture || user.profilePicture;
       user.authProvider = 'google';
-      if (googleProfile.picture) {
-        user.profilePicture = googleProfile.picture;
-      }
       await user.save();
-      return user;
+    } else {
+      user = await this.create({
+        name: profile.name,
+        email: profile.email,
+        googleId: profile.id,
+        profilePicture: profile.picture,
+        authProvider: 'google'
+      });
     }
-    
-    // Create new user
-    user = new this({
-      email: googleProfile.email,
-      name: googleProfile.name,
-      googleId: googleProfile.id,
-      profilePicture: googleProfile.picture,
-      authProvider: 'google'
-    });
-    
-    await user.save();
-    return user;
-  } catch (error) {
-    throw new Error('Google signin error: ' + error.message);
   }
+  
+  return user;
+};
+
+// Find or create LinkedIn user
+userSchema.statics.findOrCreateLinkedInUser = async function(profile) {
+  let user = await this.findOne({ linkedinId: profile.id });
+  
+  if (!user) {
+    user = await this.findOne({ email: profile.email });
+    
+    if (user) {
+      user.linkedinId = profile.id;
+      user.profilePicture = profile.picture || user.profilePicture;
+      user.authProvider = 'linkedin';
+      await user.save();
+    } else {
+      user = await this.create({
+        name: profile.name,
+        email: profile.email,
+        linkedinId: profile.id,
+        profilePicture: profile.picture,
+        authProvider: 'linkedin'
+      });
+    }
+  }
+  
+  return user;
 };
 
 module.exports = mongoose.model('User', userSchema);
-
-// If you need to export linkedinSignin from this file, define it here or import it from another file
-// Example placeholder function:
-// const linkedinSignin = (req, res) => { /* implementation */ };
-// module.exports.linkedinSignin = linkedinSignin;
