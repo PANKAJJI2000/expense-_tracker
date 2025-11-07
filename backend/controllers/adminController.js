@@ -905,6 +905,257 @@ const deleteTransactionHistory = async (req, res) => {
   }
 };
 
+// Admin specific controllers
+const getStats = async (req, res) => {
+  try {
+    const totalUsers = await User.countDocuments();
+    const totalExpenses = await Expense.countDocuments();
+    
+    const amountResult = await Expense.aggregate([
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const totalAmount = amountResult.length > 0 ? amountResult[0].total : 0;
+
+    // Calculate monthly growth
+    const currentDate = new Date();
+    const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+    const currentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+
+    const lastMonthExpenses = await Expense.countDocuments({
+      createdAt: { $gte: lastMonth, $lt: currentMonth }
+    });
+
+    const currentMonthExpenses = await Expense.countDocuments({
+      createdAt: { $gte: currentMonth }
+    });
+
+    const monthlyGrowth = lastMonthExpenses > 0 
+      ? ((currentMonthExpenses - lastMonthExpenses) / lastMonthExpenses * 100).toFixed(2)
+      : 0;
+
+    res.json({
+      totalUsers,
+      totalExpenses,
+      totalAmount,
+      monthlyGrowth: parseFloat(monthlyGrowth)
+    });
+  } catch (error) {
+    console.error('Get stats error:', error);
+    res.status(500).json({ error: 'Failed to fetch stats', message: error.message });
+  }
+};
+
+const getUpdatedExpenses = async (req, res) => {
+  try {
+    const expenses = await Expense.find()
+      .sort({ updatedAt: -1 })
+      .limit(20)
+      .populate('userId', 'name email')
+      .lean();
+
+    const formattedExpenses = expenses.map(expense => ({
+      _id: expense._id,
+      description: expense.description,
+      amount: expense.amount,
+      category: expense.category,
+      userEmail: expense.userId?.email || 'Unknown',
+      userName: expense.userId?.name || 'Unknown',
+      updatedAt: expense.updatedAt,
+      createdAt: expense.createdAt
+    }));
+
+    res.json(formattedExpenses);
+  } catch (error) {
+    console.error('Get updated expenses error:', error);
+    res.status(500).json({ error: 'Failed to fetch expenses', message: error.message });
+  }
+};
+
+const getTrends = async (req, res) => {
+  try {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const trends = await Expense.aggregate([
+      { $match: { createdAt: { $gte: sevenDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          expenses: { $sum: 1 },
+          amount: { $sum: '$amount' }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const formattedTrends = trends.map(trend => ({
+      day: days[new Date(trend._id).getDay()],
+      expenses: trend.expenses,
+      amount: Math.round(trend.amount)
+    }));
+
+    res.json(formattedTrends);
+  } catch (error) {
+    console.error('Get trends error:', error);
+    res.status(500).json({ error: 'Failed to fetch trends', message: error.message });
+  }
+};
+
+const getCategoryStats = async (req, res) => {
+  try {
+    const categoryStats = await Expense.aggregate([
+      {
+        $group: {
+          _id: '$category',
+          value: { $sum: '$amount' },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { value: -1 } }
+    ]);
+
+    const formattedStats = categoryStats.map(stat => ({
+      name: stat._id || 'Uncategorized',
+      value: Math.round(stat.value),
+      count: stat.count
+    }));
+
+    res.json(formattedStats);
+  } catch (error) {
+    console.error('Get category stats error:', error);
+    res.status(500).json({ error: 'Failed to fetch category stats', message: error.message });
+  }
+};
+
+const getMonthlyStats = async (req, res) => {
+  try {
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    // Check if there are any expenses at all
+    const totalExpenses = await Expense.countDocuments();
+    console.log('Total expenses in database:', totalExpenses);
+
+    if (totalExpenses === 0) {
+      console.log('No expenses found, returning empty array');
+      return res.json([]);
+    }
+
+    // Use flexible date field matching (createdAt or date)
+    const monthlyStats = await Expense.aggregate([
+      { 
+        $addFields: {
+          effectiveDate: { 
+            $cond: {
+              if: { $ifNull: ['$createdAt', false] },
+              then: '$createdAt',
+              else: { $ifNull: ['$date', new Date()] }
+            }
+          }
+        }
+      },
+      { 
+        $match: { 
+          effectiveDate: { $gte: sixMonthsAgo } 
+        } 
+      },
+      {
+        $group: {
+          _id: { 
+            $dateToString: { 
+              format: '%Y-%m', 
+              date: '$effectiveDate'
+            } 
+          },
+          expenses: { $sum: 1 },
+          amount: { $sum: { $ifNull: ['$amount', 0] } },
+          users: { $addToSet: '$userId' }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    console.log('Monthly stats aggregation result:', monthlyStats);
+
+    // If no data in the last 6 months, return empty array
+    if (!monthlyStats || monthlyStats.length === 0) {
+      console.log('No monthly stats data found for last 6 months');
+      return res.json([]);
+    }
+
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const formattedStats = monthlyStats.map(stat => {
+      try {
+        // Parse the year-month string
+        const [year, month] = stat._id.split('-');
+        const monthIndex = parseInt(month) - 1; // Convert to 0-based index
+        
+        return {
+          month: months[monthIndex] || stat._id,
+          expenses: stat.expenses || 0,
+          amount: Math.round(stat.amount || 0),
+          users: (stat.users || []).filter(id => id !== null && id !== undefined).length
+        };
+      } catch (err) {
+        console.error('Error formatting month stat:', err, 'stat:', stat);
+        return {
+          month: stat._id,
+          expenses: stat.expenses || 0,
+          amount: Math.round(stat.amount || 0),
+          users: (stat.users || []).length
+        };
+      }
+    });
+
+    console.log('Formatted monthly stats:', formattedStats);
+    res.json(formattedStats);
+  } catch (error) {
+    console.error('Get monthly stats error:', error);
+    console.error('Error stack:', error.stack);
+    // Return empty array instead of error to prevent frontend crash
+    res.json([]);
+  }
+};
+
+const getTopUsers = async (req, res) => {
+  try {
+    const topUsers = await Expense.aggregate([
+      {
+        $group: {
+          _id: '$userId',
+          totalSpent: { $sum: '$amount' },
+          expenseCount: { $sum: 1 }
+        }
+      },
+      { $sort: { totalSpent: -1 } },
+      { $limit: 10 }
+    ]);
+
+    // Populate user details
+    const userIds = topUsers.map(u => u._id).filter(id => id); // Filter out null/undefined
+    const users = await User.find({ _id: { $in: userIds } }).select('name email').lean();
+    
+    const userMap = {};
+    users.forEach(user => {
+      userMap[user._id.toString()] = user;
+    });
+
+    const formattedTopUsers = topUsers.map(stat => ({
+      _id: stat._id,
+      name: userMap[stat._id?.toString()]?.name || 'Unknown',
+      email: userMap[stat._id?.toString()]?.email || 'Unknown',
+      totalSpent: Math.round(stat.totalSpent),
+      expenseCount: stat.expenseCount
+    }));
+
+    res.json(formattedTopUsers);
+  } catch (error) {
+    console.error('Get top users error:', error);
+    res.status(500).json({ error: 'Failed to fetch top users', message: error.message });
+  }
+};
+
 module.exports = {
   adminLogin,
   verifyAdmin,
@@ -934,5 +1185,12 @@ module.exports = {
   deleteTransaction,
   // Transaction History routes
   getTransactionHistory,
-  deleteTransactionHistory
+  deleteTransactionHistory,
+  // Admin dashboard specific routes - NOW EXPORTED
+  getStats,
+  getUpdatedExpenses,
+  getTrends,
+  getCategoryStats,
+  getMonthlyStats,
+  getTopUsers
 };

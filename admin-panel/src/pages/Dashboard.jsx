@@ -93,7 +93,6 @@ const Dashboard = () => {
   const [trendData, setTrendData] = useState([])
   const [categoryData, setCategoryData] = useState([])
   const [monthlyData, setMonthlyData] = useState([])
-  const [topUsers, setTopUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [retryCount, setRetryCount] = useState(0)
@@ -122,7 +121,6 @@ const Dashboard = () => {
       let trendsData = []
       let categoriesData = []
       let monthData = []
-      let usersData = []
       
       // Fetch stats
       try {
@@ -205,19 +203,6 @@ const Dashboard = () => {
         setMonthlyData(mockMonthly)
       }
 
-      // Fetch top spending users
-      try {
-        console.log('Fetching top users from /admin/top-users...')
-        const usersRes = await api.get('/admin/top-users')
-        console.log('Top users response:', usersRes.data)
-        
-        usersData = Array.isArray(usersRes.data) ? usersRes.data : []
-        setTopUsers(usersData)
-      } catch (usersError) {
-        console.error('Failed to fetch top users:', usersError)
-        setTopUsers([])
-      }
-      
       setLastFetchTime(new Date())
       setError(null)
       
@@ -536,55 +521,8 @@ const Dashboard = () => {
 
       {/* Additional Stats Section */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        {/* Top Spending Users */}
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Top Spending Users
-            </Typography>
-            <List>
-              {topUsers.length > 0 ? (
-                topUsers.slice(0, 5).map((user, index) => (
-                  <ListItem key={user._id || index}>
-                    <ListItemText
-                      primary={
-                        <Box display="flex" justifyContent="space-between" alignItems="center">
-                          <Typography variant="body1">
-                            {user.email || user.name || 'Unknown User'}
-                          </Typography>
-                          <Chip 
-                            label={`$${(user.totalSpent || 0).toLocaleString()}`} 
-                            size="small" 
-                            color="primary"
-                          />
-                        </Box>
-                      }
-                      secondary={
-                        <Box sx={{ mt: 1 }}>
-                          <Typography variant="caption" color="textSecondary">
-                            {user.expenseCount || 0} expenses
-                          </Typography>
-                          <LinearProgress 
-                            variant="determinate" 
-                            value={Math.min((user.totalSpent / (topUsers[0]?.totalSpent || 1)) * 100, 100)} 
-                            sx={{ mt: 0.5 }}
-                          />
-                        </Box>
-                      }
-                    />
-                  </ListItem>
-                ))
-              ) : (
-                <ListItem>
-                  <ListItemText primary="No user data available" />
-                </ListItem>
-              )}
-            </List>
-          </Paper>
-        </Grid>
-
         {/* Category Details */}
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
               Category Breakdown Details

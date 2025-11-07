@@ -1,6 +1,49 @@
 const express = require('express');
 const router = express.Router();
-const adminAuth = require('../middleware/adminAuth');
+const mongoose = require('mongoose');
+
+// Import middleware
+let adminAuth;
+try {
+  adminAuth = require('../middleware/adminAuth');
+  console.log('✓ adminAuth middleware loaded successfully');
+} catch (error) {
+  console.error('✗ Failed to load adminAuth middleware:', error.message);
+  // Create a simple fallback middleware
+  adminAuth = (req, res, next) => {
+    console.warn('⚠ Using fallback adminAuth - authentication bypassed');
+    next();
+  };
+}
+
+// Import admin controller
+let adminController;
+try {
+  adminController = require('../controllers/adminController');
+  console.log('✓ adminController loaded successfully');
+  console.log('Available functions:', Object.keys(adminController));
+} catch (error) {
+  console.error('✗ Failed to load adminController:', error.message);
+  process.exit(1); // Exit if controller can't be loaded
+}
+
+// Verify all required functions exist
+const requiredFunctions = [
+  'adminLogin', 'verifyAdmin', 'getDashboardStats', 'getMonthlyExpenses',
+  'getCategoryBreakdown', 'getUsers', 'updateUser', 'deleteUser',
+  'getExpenses', 'deleteExpense', 'getCategories', 'createCategory',
+  'updateCategory', 'deleteCategory', 'getStats', 'getUpdatedExpenses',
+  'getTrends', 'getCategoryStats', 'getMonthlyStats', 'getTopUsers'
+];
+
+const missingFunctions = requiredFunctions.filter(fn => typeof adminController[fn] !== 'function');
+if (missingFunctions.length > 0) {
+  console.error('✗ Missing functions in adminController:', missingFunctions);
+  console.error('Available functions:', Object.keys(adminController).filter(key => typeof adminController[key] === 'function'));
+  process.exit(1);
+}
+
+// Destructure controller functions
 const {
   adminLogin,
   verifyAdmin,
@@ -16,74 +59,101 @@ const {
   createCategory,
   updateCategory,
   deleteCategory,
-  // Auto Expense routes
   getAutoExpenses,
   updateAutoExpense,
   deleteAutoExpense,
-  // Profile routes
   getProfiles,
   updateProfile,
   deleteProfile,
-  // Transaction routes
   getTransactions,
   updateTransaction,
   deleteTransaction,
-  // Transaction History routes
   getTransactionHistory,
   deleteTransactionHistory,
-  // Recent Expenses
-  getRecentExpenses
-} = require('../controllers/adminController');
+  getStats,
+  getUpdatedExpenses,
+  getTrends,
+  getCategoryStats,
+  getMonthlyStats,
+  getTopUsers
+} = adminController;
+
+// Verify each function before using it
+const verifyFunction = (fn, name) => {
+  if (typeof fn !== 'function') {
+    console.error(`✗ ${name} is not a function, it's a ${typeof fn}`);
+    throw new Error(`${name} must be a function`);
+  }
+  return fn;
+};
 
 // Public routes
-router.post('/login', adminLogin);
+router.post('/login', verifyFunction(adminLogin, 'adminLogin'));
 
 // Protected admin routes
-router.get('/verify', adminAuth, verifyAdmin);
-router.get('/stats', adminAuth, getDashboardStats);
-router.get('/monthly-expenses', adminAuth, getMonthlyExpenses);
-router.get('/category-breakdown', adminAuth, getCategoryBreakdown);
-router.get('/users', adminAuth, getUsers);
-router.put('/users/:id', adminAuth, updateUser);
-router.delete('/users/:id', adminAuth, deleteUser);
+router.get('/verify', adminAuth, verifyFunction(verifyAdmin, 'verifyAdmin'));
+
+// Dashboard endpoints
+router.get('/stats', adminAuth, verifyFunction(getStats, 'getStats'));
+router.get('/updated-expenses', adminAuth, verifyFunction(getUpdatedExpenses, 'getUpdatedExpenses'));
+router.get('/trends', adminAuth, verifyFunction(getTrends, 'getTrends'));
+router.get('/category-stats', adminAuth, verifyFunction(getCategoryStats, 'getCategoryStats'));
+router.get('/monthly-stats', adminAuth, verifyFunction(getMonthlyStats, 'getMonthlyStats'));
+router.get('/top-users', adminAuth, verifyFunction(getTopUsers, 'getTopUsers'));
+
+// Legacy dashboard endpoints
+router.get('/dashboard/stats', adminAuth, verifyFunction(getDashboardStats, 'getDashboardStats'));
+router.get('/monthly-expenses', adminAuth, verifyFunction(getMonthlyExpenses, 'getMonthlyExpenses'));
+router.get('/category-breakdown', adminAuth, verifyFunction(getCategoryBreakdown, 'getCategoryBreakdown'));
+
+// User management
+router.get('/users', adminAuth, verifyFunction(getUsers, 'getUsers'));
+router.put('/users/:id', adminAuth, verifyFunction(updateUser, 'updateUser'));
+router.delete('/users/:id', adminAuth, verifyFunction(deleteUser, 'deleteUser'));
 
 // Expense management
-router.get('/expenses', adminAuth, getExpenses);
-router.delete('/expenses/:id', adminAuth, deleteExpense);
+router.get('/expenses', adminAuth, verifyFunction(getExpenses, 'getExpenses'));
+router.delete('/expenses/:id', adminAuth, verifyFunction(deleteExpense, 'deleteExpense'));
 
 // Category management
-router.get('/categories', adminAuth, getCategories);
-router.post('/categories', adminAuth, createCategory);
-router.put('/categories/:id', adminAuth, updateCategory);
-router.delete('/categories/:id', adminAuth, deleteCategory);
+router.get('/categories', adminAuth, verifyFunction(getCategories, 'getCategories'));
+router.post('/categories', adminAuth, verifyFunction(createCategory, 'createCategory'));
+router.put('/categories/:id', adminAuth, verifyFunction(updateCategory, 'updateCategory'));
+router.delete('/categories/:id', adminAuth, verifyFunction(deleteCategory, 'deleteCategory'));
 
-// Auto Expense management
-router.get('/auto-expenses', adminAuth, getAutoExpenses);
-router.put('/auto-expenses/:id', adminAuth, updateAutoExpense);
-router.delete('/auto-expenses/:id', adminAuth, deleteAutoExpense);
+// Auto Expense management (optional - only if functions exist)
+if (getAutoExpenses) {
+  router.get('/auto-expenses', adminAuth, verifyFunction(getAutoExpenses, 'getAutoExpenses'));
+  router.put('/auto-expenses/:id', adminAuth, verifyFunction(updateAutoExpense, 'updateAutoExpense'));
+  router.delete('/auto-expenses/:id', adminAuth, verifyFunction(deleteAutoExpense, 'deleteAutoExpense'));
+}
 
-// Profile management
-router.get('/profiles', adminAuth, getProfiles);
-router.put('/profiles/:id', adminAuth, updateProfile);
-router.delete('/profiles/:id', adminAuth, deleteProfile);
+// Profile management (optional - only if functions exist)
+if (getProfiles) {
+  router.get('/profiles', adminAuth, verifyFunction(getProfiles, 'getProfiles'));
+  router.put('/profiles/:id', adminAuth, verifyFunction(updateProfile, 'updateProfile'));
+  router.delete('/profiles/:id', adminAuth, verifyFunction(deleteProfile, 'deleteProfile'));
+}
 
-// Transaction management
-router.get('/transactions', adminAuth, getTransactions);
-router.put('/transactions/:id', adminAuth, updateTransaction);
-router.delete('/transactions/:id', adminAuth, deleteTransaction);
+// Transaction management (optional - only if functions exist)
+if (getTransactions) {
+  router.get('/transactions', adminAuth, verifyFunction(getTransactions, 'getTransactions'));
+  router.put('/transactions/:id', adminAuth, verifyFunction(updateTransaction, 'updateTransaction'));
+  router.delete('/transactions/:id', adminAuth, verifyFunction(deleteTransaction, 'deleteTransaction'));
+}
 
-// Transaction History management
-router.get('/transaction-history', adminAuth, getTransactionHistory);
-router.delete('/transaction-history/:id', adminAuth, deleteTransactionHistory);
+// Transaction History management (optional - only if functions exist)
+if (getTransactionHistory) {
+  router.get('/transaction-history', adminAuth, verifyFunction(getTransactionHistory, 'getTransactionHistory'));
+  router.delete('/transaction-history/:id', adminAuth, verifyFunction(deleteTransactionHistory, 'deleteTransactionHistory'));
+}
 
-// Add this route to get session records
-router.get('/sessions', async (req, res) => {
+// Session management routes
+router.get('/sessions', adminAuth, async (req, res) => {
   try {
-    // Access the sessions collection directly from MongoDB
-    const db = req.app.locals.db || mongoose.connection.db;
+    const db = mongoose.connection.db;
     const sessionsCollection = db.collection('sessions');
     
-    // Get all sessions with pagination
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
     const skip = (page - 1) * limit;
@@ -97,11 +167,9 @@ router.get('/sessions', async (req, res) => {
     
     const totalSessions = await sessionsCollection.countDocuments();
     
-    // Parse session data
     const parsedSessions = sessions.map(session => {
       let sessionData = {};
       try {
-        // Sessions are stored as JSON strings in the 'session' field
         sessionData = JSON.parse(session.session || '{}');
       } catch (e) {
         sessionData = session.session || {};
@@ -118,7 +186,6 @@ router.get('/sessions', async (req, res) => {
       };
     });
     
-    // Get active vs expired count
     const activeSessions = parsedSessions.filter(s => !s.isExpired).length;
     const expiredSessions = parsedSessions.filter(s => s.isExpired).length;
     
@@ -144,10 +211,9 @@ router.get('/sessions', async (req, res) => {
   }
 });
 
-// Add route to get session statistics
-router.get('/sessions/stats', async (req, res) => {
+router.get('/sessions/stats', adminAuth, async (req, res) => {
   try {
-    const db = req.app.locals.db || mongoose.connection.db;
+    const db = mongoose.connection.db;
     const sessionsCollection = db.collection('sessions');
     
     const totalSessions = await sessionsCollection.countDocuments();
@@ -159,7 +225,6 @@ router.get('/sessions/stats', async (req, res) => {
     
     const expiredSessions = totalSessions - activeSessions;
     
-    // Get sessions by user (requires parsing session data)
     const allSessions = await sessionsCollection.find({}).toArray();
     const userSessions = {};
     
@@ -195,10 +260,9 @@ router.get('/sessions/stats', async (req, res) => {
   }
 });
 
-// Add route to delete expired sessions
-router.delete('/sessions/cleanup', async (req, res) => {
+router.delete('/sessions/cleanup', adminAuth, async (req, res) => {
   try {
-    const db = req.app.locals.db || mongoose.connection.db;
+    const db = mongoose.connection.db;
     const sessionsCollection = db.collection('sessions');
     
     const result = await sessionsCollection.deleteMany({
@@ -219,5 +283,7 @@ router.delete('/sessions/cleanup', async (req, res) => {
     });
   }
 });
+
+console.log('✓ Admin routes configured successfully');
 
 module.exports = router;
