@@ -1,6 +1,12 @@
 const mongoose = require("mongoose");
 
 const profileSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    unique: true
+  },
   name: { 
     type: String, 
     required: [true, "Name is required"],
@@ -39,12 +45,12 @@ const profileSchema = new mongoose.Schema({
     type: String,
     default: null
   }
-  // ✅ NO userId field - Profile is the main user entity
 }, { timestamps: true });
 
 // Add indexes for better performance
 profileSchema.index({ email: 1 });
 profileSchema.index({ referralCode: 1 });
+profileSchema.index({ userId: 1 }); // Add index for userId
 
 // Generate unique referral code before saving
 profileSchema.pre('save', async function(next) {
@@ -66,6 +72,26 @@ profileSchema.pre('save', async function(next) {
     next();
   } catch (error) {
     next(error);
+  }
+});
+
+// Auto-sync email changes to User after profile update
+profileSchema.post('findOneAndUpdate', async function(doc) {
+  if (doc) {
+    try {
+      const User = mongoose.model('User');
+      
+      // Find associated user
+      const user = await User.findOne({ profile: doc._id });
+      
+      if (user && user.email !== doc.email) {
+        user.email = doc.email;
+        await user.save();
+        console.log(`✅ User email synced with Profile: ${doc.email}`);
+      }
+    } catch (error) {
+      console.error('Error syncing User with Profile:', error.message);
+    }
   }
 });
 

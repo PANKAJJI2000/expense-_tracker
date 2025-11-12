@@ -14,6 +14,7 @@ const transactionHistoryRoutes = require('./routes/transactionHistoryRoutes');
 const autoExpenseRoutes = require('./routes/autoExpenseRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -81,12 +82,13 @@ app.use((req, res, next) => {
 // API Routes - All admin panel requests will use these endpoints
 app.use('/api/auth', authRoutes);
 app.use('/api/expenses', expenseRoutes);
-app.use('/api/profiles', profileRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/transaction-history', transactionHistoryRoutes);
 app.use('/api/auto-expenses', autoExpenseRoutes);
 app.use('/api/admin', adminRoutes); // Admin panel specific routes
 app.use('/api/categories', categoryRoutes);
+app.use('/api/profiles', profileRoutes); // Profile routes
+app.use('/api/users', userRoutes); // User routes
 
 // Health check endpoint - Enhanced with session info
 app.get('/api/health', (req, res) => {
@@ -106,12 +108,12 @@ app.get('/api/health', (req, res) => {
     routes: {
       auth: `${baseUrl}/api/auth`,
       expenses: `${baseUrl}/api/expenses`,
-      profiles: `${baseUrl}/api/profiles`,
       transactions: `${baseUrl}/api/transactions`,
       transactionHistory: `${baseUrl}/api/transaction-history`,
       autoExpenses: `${baseUrl}/api/auto-expenses`,
       admin: `${baseUrl}/api/admin`,
       categories: `${baseUrl}/api/categories`,
+      profiles: `${baseUrl}/api/profiles`, // Added profiles route
       adminSessions: `${baseUrl}/api/admin/sessions`, // Added session management
       sessionStats: `${baseUrl}/api/admin/sessions/stats` // Added session stats
     }

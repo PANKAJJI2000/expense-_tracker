@@ -1,140 +1,253 @@
-const User = require('../models/User');
 const Profile = require('../models/Profile');
-const bcrypt = require('bcryptjs');
+const User = require('../models/User');
+const mongoose = require('mongoose');
 
-const profileController = {
-  // Get user profile
-  async getProfile(req, res) {
-    try {
-      // Try to get profile from Profile model first
-      let profile = await Profile.findOne({ userId: req.user._id });
-      
-      if (!profile) {
-        // If no profile exists, create one from User data
-        profile = new Profile({
-          userId: req.user._id,
-          name: req.user.name,
-          email: req.user.email,
-          phone: req.user.phone || '', // Default empty if not exists
-        });
-        await profile.save();
-      }
-      
-      res.json({ success: true, data: profile });
-    } catch (error) {
-      res.status(500).json({ 
+// @desc    Create new profile
+// @route   POST /api/profiles
+// @access  Private
+exports.createProfile = async (req, res) => {
+  try {
+    const { userId, name, email, phone, profilePic, referredBy } = req.body;
+
+    // Check if profile already exists for this user
+    const existingProfile = await Profile.findOne({ userId });
+    if (existingProfile) {
+      return res.status(400).json({ 
         success: false, 
-        error: 'Server error', 
-        details: error.message 
+        message: 'Profile already exists for this user' 
       });
     }
-  },
 
-  // Update user profile
-  async updateProfile(req, res) {
-    try {
-      const { name, email, phone, profilePic } = req.body;
-      
-      // Build update object with only provided fields
-      const updateData = {};
-      if (name !== undefined) updateData.name = name;
-      if (email !== undefined) updateData.email = email;
-      if (phone !== undefined) updateData.phone = phone;
-      if (profilePic !== undefined) updateData.profilePic = profilePic;
-
-      // Check if there's anything to update
-      if (Object.keys(updateData).length === 0) {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'No fields provided for update' 
-        });
-      }
-
-      // Check email uniqueness if email is being updated
-      if (email) {
-        const existingProfile = await Profile.findOne({ 
-          email: email.toLowerCase(),
-          userId: { $ne: req.user._id }
-        });
-        if (existingProfile) {
-          return res.status(400).json({ 
-            success: false, 
-            error: 'Email already in use by another profile' 
-          });
-        }
-      }
-
-      // Update or create profile
-      let profile = await Profile.findOneAndUpdate(
-        { userId: req.user._id },
-        updateData,
-        { 
-          new: true, 
-          upsert: true,
-          runValidators: false // Disable validation for partial updates
-        }
-      );
-
-      // Also update User model if email or name is changed
-      if (email || name) {
-        const userUpdate = {};
-        if (email) userUpdate.email = email;
-        if (name) userUpdate.name = name;
-        
-        await User.findByIdAndUpdate(req.user._id, userUpdate);
-      }
-      
-      res.json({ 
-        success: true, 
-        data: profile,
-        message: 'Profile updated successfully' 
-      });
-    } catch (error) {
-      res.status(500).json({ 
+    // Check if email already exists
+    const emailExists = await Profile.findOne({ email });
+    if (emailExists) {
+      return res.status(400).json({ 
         success: false, 
-        error: 'Server error', 
-        details: error.message 
+        message: 'Email already in use' 
       });
     }
-  },
 
-  // Change password
-  async changePassword(req, res) {
-    try {
-      const { currentPassword, newPassword } = req.body;
-      
-      if (!currentPassword || !newPassword) {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'Current and new passwords are required' 
-        });
-      }
-      
-      const user = await User.findById(req.user._id);
-      const isValidPassword = await user.comparePassword(currentPassword);
-      
-      if (!isValidPassword) {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'Current password is incorrect' 
-        });
-      }
-      
-      user.password = newPassword;
-      await user.save();
-      
-      res.json({ 
-        success: true, 
-        message: 'Password updated successfully' 
-      });
-    } catch (error) {
-      res.status(500).json({ 
-        success: false, 
-        error: 'Server error', 
-        details: error.message 
-      });
-    }
+    // Create profile
+    const profile = await Profile.create({
+      userId,
+      name,
+      email,
+      phone,
+      profilePic,
+      referredBy
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Profile created successfully',
+      data: profile
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
   }
 };
 
-module.exports = profileController;
+// @desc    Get all profiles
+// @route   GET /api/profiles
+// @access  Private/Admin
+exports.getAllProfiles = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search = '' } = req.query;
+
+    const query = search 
+      ? { 
+          $or: [
+            { name: { $regex: search, $options: 'i' } },
+            { email: { $regex: search, $options: 'i' } },
+            { phone: { $regex: search, $options: 'i' } }
+          ]
+        }
+      : {};
+
+    const profiles = await Profile.find(query)
+      .populate('userId', 'username email')
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ createdAt: -1 });
+
+    const count = await Profile.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      count: profiles.length,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+      data: profiles
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// @desc    Get single profile by ID
+// @route   GET /api/profiles/:id
+// @access  Private
+exports.getProfileById = async (req, res) => {
+  try {
+    const profile = await Profile.findById(req.params.id)
+      .populate('userId', 'username email');
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Profile not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: profile
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// @desc    Get profile by user ID
+// @route   GET /api/profiles/user/:userId
+// @access  Private
+exports.getProfileByUserId = async (req, res) => {
+  try {
+    const profile = await Profile.findOne({ userId: req.params.userId })
+      .populate('userId', 'username email');
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Profile not found for this user'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: profile
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// @desc    Update profile
+// @route   PUT /api/profiles/:id
+// @access  Private
+exports.updateProfile = async (req, res) => {
+  try {
+    const { name, email, phone, profilePic } = req.body;
+
+    // Check if email is being changed and if it's already in use
+    if (email) {
+      const emailExists = await Profile.findOne({ 
+        email, 
+        _id: { $ne: req.params.id } 
+      });
+      if (emailExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email already in use'
+        });
+      }
+    }
+
+    const profile = await Profile.findByIdAndUpdate(
+      req.params.id,
+      { name, email, phone, profilePic },
+      { 
+        new: true, 
+        runValidators: true 
+      }
+    );
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Profile not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: profile
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// @desc    Delete profile
+// @route   DELETE /api/profiles/:id
+// @access  Private/Admin
+exports.deleteProfile = async (req, res) => {
+  try {
+    const profile = await Profile.findByIdAndDelete(req.params.id);
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Profile not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile deleted successfully',
+      data: profile
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// @desc    Get profile by referral code
+// @route   GET /api/profiles/referral/:code
+// @access  Public
+exports.getProfileByReferralCode = async (req, res) => {
+  try {
+    const profile = await Profile.findOne({ 
+      referralCode: req.params.code.toUpperCase() 
+    });
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invalid referral code'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        name: profile.name,
+        referralCode: profile.referralCode
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
