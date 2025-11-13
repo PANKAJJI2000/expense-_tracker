@@ -72,8 +72,8 @@ exports.updateUser = async (req, res) => {
     const oldEmail = user.email;
 
     // Check if username is being changed and already exists
-    if (username && username !== user.username) {
-      const existingUser = await User.findOne({ username });
+    if (username && username !== user.name) {
+      const existingUser = await User.findOne({ name:username });
       if (existingUser) {
         return res.status(400).json({
           success: false,
@@ -107,7 +107,7 @@ exports.updateUser = async (req, res) => {
     // Update user
     user = await User.findByIdAndUpdate(
       req.params.id,
-      { username, email, role, isActive },
+      { name, email, role, isActive },
       { new: true, runValidators: true }
     ).select("-password").populate("profile");
 

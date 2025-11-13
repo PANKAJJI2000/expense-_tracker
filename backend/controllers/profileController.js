@@ -1,6 +1,6 @@
-const Profile = require('../models/Profile');
-const User = require('../models/User');
-const mongoose = require('mongoose');
+const Profile = require("../models/Profile");
+const User = require("../models/User");
+const mongoose = require("mongoose");
 
 // @desc    Create new profile
 // @route   POST /api/profiles
@@ -12,18 +12,18 @@ exports.createProfile = async (req, res) => {
     // Check if profile already exists for this user
     const existingProfile = await Profile.findOne({ userId });
     if (existingProfile) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Profile already exists for this user' 
+      return res.status(400).json({
+        success: false,
+        message: "Profile already exists for this user",
       });
     }
 
     // Check if email already exists
     const emailExists = await Profile.findOne({ email });
     if (emailExists) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Email already in use' 
+      return res.status(400).json({
+        success: false,
+        message: "Email already in use",
       });
     }
 
@@ -34,18 +34,18 @@ exports.createProfile = async (req, res) => {
       email,
       phone,
       profilePic,
-      referredBy
+      referredBy,
     });
 
     res.status(201).json({
       success: true,
-      message: 'Profile created successfully',
-      data: profile
+      message: "Profile created successfully",
+      data: profile,
     });
   } catch (error) {
     res.status(400).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -55,20 +55,20 @@ exports.createProfile = async (req, res) => {
 // @access  Private/Admin
 exports.getAllProfiles = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '' } = req.query;
+    const { page = 1, limit = 10, search = "" } = req.query;
 
-    const query = search 
-      ? { 
+    const query = search
+      ? {
           $or: [
-            { name: { $regex: search, $options: 'i' } },
-            { email: { $regex: search, $options: 'i' } },
-            { phone: { $regex: search, $options: 'i' } }
-          ]
+            { name: { $regex: search, $options: "i" } },
+            { email: { $regex: search, $options: "i" } },
+            { phone: { $regex: search, $options: "i" } },
+          ],
         }
       : {};
 
     const profiles = await Profile.find(query)
-      .populate('userId', 'username email')
+      .populate("userId", "username email")
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .sort({ createdAt: -1 });
@@ -80,12 +80,12 @@ exports.getAllProfiles = async (req, res) => {
       count: profiles.length,
       totalPages: Math.ceil(count / limit),
       currentPage: page,
-      data: profiles
+      data: profiles,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -95,24 +95,26 @@ exports.getAllProfiles = async (req, res) => {
 // @access  Private
 exports.getProfileById = async (req, res) => {
   try {
-    const profile = await Profile.findById(req.params.id)
-      .populate('userId', 'username email');
+    const profile = await Profile.findById(req.params.id).populate(
+      "userId",
+      "username email"
+    );
 
     if (!profile) {
       return res.status(404).json({
         success: false,
-        message: 'Profile not found'
+        message: "Profile not found",
       });
     }
 
     res.status(200).json({
       success: true,
-      data: profile
+      data: profile,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -122,24 +124,25 @@ exports.getProfileById = async (req, res) => {
 // @access  Private
 exports.getProfileByUserId = async (req, res) => {
   try {
-    const profile = await Profile.findOne({ userId: req.params.userId })
-      .populate('userId', 'username email');
+    const profile = await Profile.findOne({
+      userId: req.params.userId,
+    }).populate("userId", "username email");
 
     if (!profile) {
       return res.status(404).json({
         success: false,
-        message: 'Profile not found for this user'
+        message: "Profile not found for this user",
       });
     }
 
     res.status(200).json({
       success: true,
-      data: profile
+      data: profile,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -149,18 +152,19 @@ exports.getProfileByUserId = async (req, res) => {
 // @access  Private
 exports.updateProfile = async (req, res) => {
   try {
-    const { name, email, phone, profilePic } = req.body;
+    const { name, oldEmail,email, phone, profilePic } = req.body;
 
+    console.log("    Update Profile Request Body:", req.body);
     // Check if email is being changed and if it's already in use
     if (email) {
-      const emailExists = await Profile.findOne({ 
-        email, 
-        _id: { $ne: req.params.id } 
+      const emailExists = await Profile.findOne({
+        email,
+        _id: { $ne: req.params.id },
       });
       if (emailExists) {
         return res.status(400).json({
           success: false,
-          message: 'Email already in use'
+          message: "Email already in use",
         });
       }
     }
@@ -168,28 +172,53 @@ exports.updateProfile = async (req, res) => {
     const profile = await Profile.findByIdAndUpdate(
       req.params.id,
       { name, email, phone, profilePic },
-      { 
-        new: true, 
-        runValidators: true 
+      {
+        new: true,
+        runValidators: true,
       }
     );
 
+    //
+    // const user = await User.findOneAndUpdate(
+    //   { email: email },
+    //  { $set: { name:name, email: email } },
+    //   {
+    //     new: true,
+    //     runValidators: true
+    //   }
+    // );
+    const user = await User.findOneAndUpdate(
+      { email: oldEmail },
+     { $set: { name:name, email: email } },
+      {
+        new: true,
+        runValidators: true
+      }
+    );
+
+    // console.log("Updated User:", user);
     if (!profile) {
       return res.status(404).json({
         success: false,
-        message: 'Profile not found'
+        message: "Profile not found",
+      });
+    }
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
       });
     }
 
     res.status(200).json({
       success: true,
-      message: 'Profile updated successfully',
-      data: profile
+      message: "user Profile updated successfully",
+      data: profile,
     });
   } catch (error) {
     res.status(400).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -204,19 +233,19 @@ exports.deleteProfile = async (req, res) => {
     if (!profile) {
       return res.status(404).json({
         success: false,
-        message: 'Profile not found'
+        message: "Profile not found",
       });
     }
 
     res.status(200).json({
       success: true,
-      message: 'Profile deleted successfully',
-      data: profile
+      message: "Profile deleted successfully",
+      data: profile,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -226,14 +255,14 @@ exports.deleteProfile = async (req, res) => {
 // @access  Public
 exports.getProfileByReferralCode = async (req, res) => {
   try {
-    const profile = await Profile.findOne({ 
-      referralCode: req.params.code.toUpperCase() 
+    const profile = await Profile.findOne({
+      referralCode: req.params.code.toUpperCase(),
     });
 
     if (!profile) {
       return res.status(404).json({
         success: false,
-        message: 'Invalid referral code'
+        message: "Invalid referral code",
       });
     }
 
@@ -241,13 +270,13 @@ exports.getProfileByReferralCode = async (req, res) => {
       success: true,
       data: {
         name: profile.name,
-        referralCode: profile.referralCode
-      }
+        referralCode: profile.referralCode,
+      },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };

@@ -16,10 +16,10 @@ const transactionSchema = new mongoose.Schema({
   },
   
   // The category of the transaction
-  // category: {
-  //   type: String,
-  //   required: false, // Made optional as it's not in the screenshot
-  // },
+  category: {
+    type: String,
+    required: false, // Made optional as it's not in the screenshot
+  },
   
   // Item name/title - "Enter the item" field from screenshot
   item: {
@@ -38,7 +38,7 @@ const transactionSchema = new mongoose.Schema({
   // Invoice upload - stores file path or URL
   invoice: {
     type: String,
-    required: false, // Optional as shown in UI
+    default: null
   },
   
   // The date of the transaction
@@ -51,8 +51,7 @@ const transactionSchema = new mongoose.Schema({
   // The method of payment used for the transaction
   paymentMethod: {
     type: String,
-    enum: ['cash', 'card', 'bank_transfer', 'digital_wallet'],
-    default: 'cash',
+    default: 'cash'
   },
   
   // The current status of the transaction

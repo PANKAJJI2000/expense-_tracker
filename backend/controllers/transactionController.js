@@ -1,4 +1,6 @@
 const Transaction = require('../models/Transaction');
+const fs = require('fs');
+const path = require('path');
 
 const transactionController = {
   async getAllTransactions(req, res) {
@@ -42,12 +44,17 @@ const transactionController = {
         amount,
         description,
         date,
-        paymentMethod: paymentMethod || 'cash'
+        paymentMethod: paymentMethod || 'cash',
+        invoice: req.file ? req.file.path : null
       });
       
       await transaction.save();
       res.status(201).json(transaction);
     } catch (error) {
+      // Delete uploaded file if transaction creation fails
+      if (req.file) {
+        fs.unlinkSync(req.file.path);
+      }
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -71,18 +78,33 @@ const transactionController = {
 
   async updateTransaction(req, res) {
     try {
+      const updateData = { ...req.body };
+      
+      // Add new invoice if uploaded
+      if (req.file) {
+        updateData.invoice = req.file.path;
+      }
+      
       const transaction = await Transaction.findOneAndUpdate(
         { _id: req.params.id, userId: req.user._id },
-        req.body,
+        updateData,
         { new: true }
       );
       
       if (!transaction) {
+        // Delete uploaded file if transaction not found
+        if (req.file) {
+          fs.unlinkSync(req.file.path);
+        }
         return res.status(404).json({ error: 'Transaction not found' });
       }
       
       res.json(transaction);
     } catch (error) {
+      // Delete uploaded file if update fails
+      if (req.file) {
+        fs.unlinkSync(req.file.path);
+      }
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },
@@ -96,6 +118,14 @@ const transactionController = {
       
       if (!transaction) {
         return res.status(404).json({ error: 'Transaction not found' });
+      }
+      
+      // Delete invoice file if exists
+      if (transaction.invoice) {
+        const filePath = path.join(__dirname, '..', transaction.invoice);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
       }
       
       res.json({ message: 'Transaction deleted successfully' });

@@ -75,27 +75,19 @@ const Profiles = () => {
       lastName: profile.lastName || '',
       phone: profile.phone || '',
       dateOfBirth: profile.dateOfBirth ? profile.dateOfBirth.split('T')[0] : '',
-      email: profile.userEmail || profile.user?.email || ''
+      email: profile.userEmail || ''
     })
     setEditDialogOpen(true)
   }
 
   const handleEditSubmit = async () => {
     try {
-      const updateData = {
-        firstName: editForm.firstName,
-        lastName: editForm.lastName,
-        phone: editForm.phone,
-        dateOfBirth: editForm.dateOfBirth,
-        email: editForm.email,
-        oldEmail:  selectedProfile.userEmail || selectedProfile.user?.email || ''
-      }
-      await api.put(`/admin/profiles/${selectedProfile._id}`, updateData)
+      await api.put(`/admin/profiles/${selectedProfile._id}`, editForm)
       setEditDialogOpen(false)
       fetchProfiles()
     } catch (error) {
       console.error('Failed to update profile:', error)
-      alert(error.response?.data?.message || 'Failed to update profile')
+      alert('Failed to update profile')
     }
   }
 
@@ -201,15 +193,6 @@ const Profiles = () => {
         <DialogContent>
           <Box sx={{ pt: 2 }}>
             <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <TextField
-                  label="Email"
-                  type="email"
-                  fullWidth
-                  value={editForm.email}
-                  onChange={(e) => handleEditFormChange('email', e.target.value)}
-                />
-              </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
                   label="First Name"
@@ -242,6 +225,14 @@ const Profiles = () => {
                   InputLabelProps={{ shrink: true }}
                   value={editForm.dateOfBirth}
                   onChange={(e) => handleEditFormChange('dateOfBirth', e.target.value)}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="Email"
+                  fullWidth
+                  value={editForm.email}
+                  onChange={(e) => handleEditFormChange('email', e.target.value)}
                 />
               </Grid>
             </Grid>
