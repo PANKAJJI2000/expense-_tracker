@@ -10,20 +10,19 @@ router.post('/', upload.single('invoice'), async (req, res) => {
   try {
     console.log('Request body:', req.body); // Debug log
     
-    const { userId, type, item, amount, date, paymentMethod, status } = req.body;
+    const { userId, item, amount, date, paymentMethod, status } = req.body;
     
     // Validate required fields based on updated schema
-    if (!userId || !type || !item || !amount) {
+    if (!userId || !item || !amount) {
       return res.status(400).json({ 
         success: false,
-        error: 'Missing required fields: userId, type, item, and amount are required' 
+        error: 'Missing required fields: userId, item, and amount are required' 
       });
     }
     
     // Create transaction with provided data
     const transactionData = {
       userId,
-      type,
       item,
       amount: parseFloat(amount),
       date: date || new Date(),
@@ -57,13 +56,13 @@ router.post('/', upload.single('invoice'), async (req, res) => {
 router.put('/:id', upload.single('invoice'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { userId, type, item, amount, date, paymentMethod, status } = req.body;
+    const { userId, item, amount, date, paymentMethod, status } = req.body;
     
     // Validate required fields based on updated schema
-    if (!userId || !type || !item || !amount) {
+    if (!userId || !item || !amount) {
       return res.status(400).json({ 
         success: false,
-        error: 'Missing required fields: userId, type, item, and amount are required' 
+        error: 'Missing required fields: userId, item, and amount are required' 
       });
     }
     
@@ -78,7 +77,6 @@ router.put('/:id', upload.single('invoice'), async (req, res) => {
     
     // Update transaction with provided data
     transaction.userId = userId;
-    transaction.type = type;
     transaction.item = item;
     transaction.amount = parseFloat(amount);
     transaction.date = date || new Date();
