@@ -28,6 +28,44 @@ const userSchema = new mongoose.Schema({
     minlength: [6, "Password must be at least 6 characters"],
     select: false
   },
+  phone: {
+    type: String,
+    default: null
+  },
+  gender: {
+    type: String,
+    enum: ["male", "female", "other", null],
+    default: null
+  },
+  currency: {
+    type: String,
+    default: null
+  },
+  profilePicture: {
+    type: String,
+    default: null
+  },
+  authProvider: {
+    type: String,
+    enum: ["local", "google", "linkedin"],
+    default: "local"
+  },
+  // googleId: {
+  //   type: String,
+  //   default: null
+  // },
+  // linkedinId: {
+  //   type: String,
+  //   default: null
+  // },
+  resetPasswordToken: {
+    type: String,
+    default: null
+  },
+  resetPasswordExpire: {
+    type: Date,
+    default: null
+  },
   role: {
     type: String,
     enum: ["user", "admin"],

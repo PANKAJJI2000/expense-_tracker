@@ -37,12 +37,12 @@ const authController = {
         name,
         email,
         password,
+        phone: phone || null,
+        gender: gender || null,
+        currency: currency || null,
+        profilePicture: null,
+        authProvider: 'local'
       };
-
-      // Only add optional fields if they are provided
-      if (phone) userData.phone = phone;
-      if (gender) userData.gender = gender;
-      if (currency) userData.currency = currency;
 
       const user = new User(userData);
 
@@ -56,7 +56,7 @@ const authController = {
       );
 
       // Return success response with all user data
-      res.status(201).json({
+     res.status(201).json({
         success: true,
         message: "User registered successfully",
         data: {
@@ -64,10 +64,10 @@ const authController = {
             id: user._id,
             name: user.name,
             email: user.email,
-            phone: user.phone || null,
-            gender: user.gender || null,
-            currency: user.currency || null,
-            profilePicture: user.profilePicture || null,
+            phone: user.phone,
+            gender: user.gender,
+            currency: user.currency,
+            profilePicture: user.profilePicture,
             authProvider: user.authProvider || 'local',
             createdAt: user.createdAt,
             updatedAt: user.updatedAt
