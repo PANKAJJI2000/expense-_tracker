@@ -39,7 +39,6 @@ const transactionController = {
       
       const transaction = new Transaction({
         userId: req.user._id,
-        type,
         category,
         amount,
         description,
