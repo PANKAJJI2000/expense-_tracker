@@ -32,8 +32,7 @@ const Profiles = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [selectedProfile, setSelectedProfile] = useState(null)
   const [editForm, setEditForm] = useState({
-    firstName: '',
-    lastName: '',
+    name: '',
     phone: '',
     dateOfBirth: '',
     email: ''
@@ -71,8 +70,7 @@ const Profiles = () => {
   const handleEdit = async (profile) => {
     setSelectedProfile(profile)
     setEditForm({
-      firstName: profile.firstName || '',
-      lastName: profile.lastName || '',
+      name: profile.name || '',
       phone: profile.phone || '',
       dateOfBirth: profile.dateOfBirth ? profile.dateOfBirth.split('T')[0] : '',
       email: profile.userEmail || profile.user?.email || ''
@@ -83,8 +81,7 @@ const Profiles = () => {
   const handleEditSubmit = async () => {
     try {
       const updateData = {
-        firstName: editForm.firstName,
-        lastName: editForm.lastName,
+        name: editForm.name,
         phone: editForm.phone,
         dateOfBirth: editForm.dateOfBirth,
         email: editForm.email,
@@ -133,8 +130,7 @@ const Profiles = () => {
             <TableHead>
               <TableRow>
                 <TableCell>ID</TableCell>
-                <TableCell>First Name</TableCell>
-                <TableCell>Last Name</TableCell>
+                <TableCell>Name</TableCell>
                 <TableCell>Phone</TableCell>
                 <TableCell>User Email</TableCell>
                 <TableCell>Date of Birth</TableCell>
@@ -145,7 +141,7 @@ const Profiles = () => {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} align="center">
+                  <TableCell colSpan={7} align="center">
                     <CircularProgress />
                   </TableCell>
                 </TableRow>
@@ -155,8 +151,7 @@ const Profiles = () => {
                     <TableCell sx={{ fontSize: '0.75rem', maxWidth: 120 }}>
                       {profile._id}
                     </TableCell>
-                    <TableCell>{profile.firstName}</TableCell>
-                    <TableCell>{profile.lastName}</TableCell>
+                    <TableCell>{profile.name}</TableCell>
                     <TableCell>{profile.phone}</TableCell>
                     <TableCell>{profile.userEmail}</TableCell>
                     <TableCell>
@@ -210,20 +205,12 @@ const Profiles = () => {
                   onChange={(e) => handleEditFormChange('email', e.target.value)}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12}>
                 <TextField
-                  label="First Name"
+                  label="Name"
                   fullWidth
-                  value={editForm.firstName}
-                  onChange={(e) => handleEditFormChange('firstName', e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Last Name"
-                  fullWidth
-                  value={editForm.lastName}
-                  onChange={(e) => handleEditFormChange('lastName', e.target.value)}
+                  value={editForm.name}
+                  onChange={(e) => handleEditFormChange('name', e.target.value)}
                 />
               </Grid>
               <Grid item xs={12}>

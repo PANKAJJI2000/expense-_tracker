@@ -27,7 +27,6 @@ const Transactions = () => {
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [transactionType, setTransactionType] = useState('')
   const [dateRange, setDateRange] = useState({
     start: '',
     end: ''
@@ -37,13 +36,12 @@ const Transactions = () => {
 
   useEffect(() => {
     fetchTransactions()
-  }, [searchTerm, transactionType, dateRange])
+  }, [searchTerm, dateRange])
 
   const fetchTransactions = async () => {
     try {
       const params = new URLSearchParams()
       if (searchTerm) params.append('search', searchTerm)
-      if (transactionType) params.append('type', transactionType)
       if (dateRange.start) params.append('startDate', dateRange.start)
       if (dateRange.end) params.append('endDate', dateRange.end)
       
@@ -81,7 +79,7 @@ const Transactions = () => {
       </Typography>
 
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} md={4}>
           <TextField
             label="Search transactions..."
             fullWidth
@@ -89,20 +87,7 @@ const Transactions = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </Grid>
-        <Grid item xs={12} md={2}>
-          <FormControl fullWidth>
-            <InputLabel>Type</InputLabel>
-            <Select
-              value={transactionType}
-              onChange={(e) => setTransactionType(e.target.value)}
-            >
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value="income">Income</MenuItem>
-              <MenuItem value="expense">Expense</MenuItem>
-            </Select>
-          </FormControl>
-        </Grid>
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} md={4}>
           <TextField
             label="Start Date"
             type="date"
@@ -112,7 +97,7 @@ const Transactions = () => {
             onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
           />
         </Grid>
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} md={4}>
           <TextField
             label="End Date"
             type="date"
@@ -132,7 +117,6 @@ const Transactions = () => {
                 <TableCell>ID</TableCell>
                 <TableCell>Description</TableCell>
                 <TableCell>Amount</TableCell>
-                <TableCell>Type</TableCell>
                 <TableCell>Reference</TableCell>
                 <TableCell>User</TableCell>
                 <TableCell>Date</TableCell>
@@ -143,7 +127,7 @@ const Transactions = () => {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center">
+                  <TableCell colSpan={8} align="center">
                     <CircularProgress />
                   </TableCell>
                 </TableRow>
@@ -155,15 +139,8 @@ const Transactions = () => {
                     </TableCell>
                     <TableCell>{transaction.description}</TableCell>
                     <TableCell>${transaction.amount?.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={transaction.type}
-                        color={transaction.type === 'income' ? 'success' : 'error'}
-                        size="small"
-                      />
-                    </TableCell>
                     <TableCell>{transaction.reference}</TableCell>
-                    <TableCell>{transaction.userEmail}</TableCell>
+                    <TableCell>{transaction.user?.name || transaction.user?.email || 'N/A'}</TableCell>
                     <TableCell>
                       {transaction.date ? new Date(transaction.date).toLocaleDateString() : ''}
                     </TableCell>

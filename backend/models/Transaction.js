@@ -7,6 +7,10 @@ const transactionSchema = new mongoose.Schema({
     ref: 'User', // Reference to your User model
     required: true,
   },
+  // name: {
+  //   type: String,
+  //   trim: true,
+  // },
   
   // The category of the transaction
   category: {

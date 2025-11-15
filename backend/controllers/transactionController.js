@@ -1,8 +1,47 @@
 const Transaction = require('../models/Transaction');
 const fs = require('fs');
 const path = require('path');
+const multer = require('multer');
+
+// Multer configuration for invoice uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, '..', 'uploads', 'invoices');
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'invoice-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const fileFilter = (req, file, cb) => {
+  // Accept images and PDFs only
+  const allowedTypes = /jpeg|jpg|png|pdf/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = allowedTypes.test(file.mimetype);
+  
+  if (mimetype && extname) {
+    return cb(null, true);
+  } else {
+    cb(new Error('Only images (jpeg, jpg, png) and PDF files are allowed!'));
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
 
 const transactionController = {
+  // Export upload middleware
+  uploadInvoice: upload.single('invoice'),
+
   async getAllTransactions(req, res) {
     try {
       const { page = 1, limit = 10, type, category } = req.query;
@@ -39,12 +78,13 @@ const transactionController = {
       
       const transaction = new Transaction({
         userId: req.user._id,
+        type,
         category,
         amount,
         description,
         date,
         paymentMethod: paymentMethod || 'cash',
-        invoice: req.file ? req.file.path : null
+        invoice: req.file ? `/uploads/invoices/${req.file.filename}` : null
       });
       
       await transaction.save();
@@ -81,7 +121,20 @@ const transactionController = {
       
       // Add new invoice if uploaded
       if (req.file) {
-        updateData.invoice = req.file.path;
+        updateData.invoice = `/uploads/invoices/${req.file.filename}`;
+        
+        // Delete old invoice if exists
+        const oldTransaction = await Transaction.findOne({
+          _id: req.params.id,
+          userId: req.user._id
+        });
+        
+        if (oldTransaction && oldTransaction.invoice) {
+          const oldFilePath = path.join(__dirname, '..', oldTransaction.invoice);
+          if (fs.existsSync(oldFilePath)) {
+            fs.unlinkSync(oldFilePath);
+          }
+        }
       }
       
       const transaction = await Transaction.findOneAndUpdate(
