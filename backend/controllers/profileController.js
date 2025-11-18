@@ -187,9 +187,9 @@ exports.updateProfile = async (req, res) => {
     //     runValidators: true
     //   }
     // );
-    const user = await User.findOneAndUpdate(
-      { email: oldEmail },
-     { $set: { name:name, email: email } },
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+     { name:name, email: email },
       {
         new: true,
         runValidators: true
@@ -197,16 +197,10 @@ exports.updateProfile = async (req, res) => {
     );
 
     // console.log("Updated User:", user);
-    if (!profile) {
+    if (!profile && !user) {
       return res.status(404).json({
         success: false,
-        message: "Profile not found",
-      });
-    }
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
+        message: "user Profile not found",
       });
     }
 
