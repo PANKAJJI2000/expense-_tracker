@@ -15,6 +15,8 @@ const autoExpenseRoutes = require('./routes/autoExpenseRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const userRoutes = require('./routes/userRoutes');
+const manageExpenseRoutes = require('./routes/manageExpenseRoutes');
+const incomeTaxHelpRoutes = require('./routes/incomeTaxHelpRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -90,6 +92,8 @@ app.use('/api/admin', adminRoutes); // Admin panel specific routes
 app.use('/api/categories', categoryRoutes);
 app.use('/api/profiles', profileRoutes); // Profile routes
 app.use('/api/users', userRoutes); // User routes
+app.use('/api/manage-expenses', manageExpenseRoutes); // Manage Expense form routes
+app.use('/api/income-tax-help', incomeTaxHelpRoutes); // Income Tax Help form routes
 
 // Health check endpoint - Enhanced with session info
 app.get('/api/health', (req, res) => {
@@ -114,9 +118,12 @@ app.get('/api/health', (req, res) => {
       autoExpenses: `${baseUrl}/api/auto-expenses`,
       admin: `${baseUrl}/api/admin`,
       categories: `${baseUrl}/api/categories`,
-      profiles: `${baseUrl}/api/profiles`, // Added profiles route
-      adminSessions: `${baseUrl}/api/admin/sessions`, // Added session management
-      sessionStats: `${baseUrl}/api/admin/sessions/stats` // Added session stats
+      profiles: `${baseUrl}/api/profiles`,
+      manageExpenses: `${baseUrl}/api/manage-expenses`,
+      incomeTaxHelp: `${baseUrl}/api/income-tax-help`,
+      adminSessions: `${baseUrl}/api/admin/sessions`,
+      sessionStats: `${baseUrl}/api/admin/sessions/stats`
+      
     }
   });
 });
@@ -249,8 +256,12 @@ app.get('/', (req, res) => {
       autoExpenses: `${baseUrl}/api/auto-expenses`,
       admin: `${baseUrl}/api/admin`,
       categories: `${baseUrl}/api/categories`,
-      adminSessions: `${baseUrl}/api/admin/sessions`, // Added
-      sessionStats: `${baseUrl}/api/admin/sessions/stats` // Added
+      manageExpenses: `${baseUrl}/api/manage-expenses`,
+      incomeTaxHelp: `${baseUrl}/api/income-tax-help`,
+      adminSessions: `${baseUrl}/api/admin/sessions`,
+      sessionStats: `${baseUrl}/api/admin/sessions/stats`,
+      debugSchemas: `${baseUrl}/api/admin/debug-schemas`,
+      debugTransactionHistory: `${baseUrl}/api/admin/debug-transaction-history`
     }
   });
 });

@@ -87,6 +87,10 @@ const verifyFunction = (fn, name) => {
   return fn;
 };
 
+// Import the new models at the top of the file
+const ManageExpense = require('../models/ManageExpense');
+const IncomeTaxHelp = require('../models/IncomeTaxHelp');
+
 // Public routes
 router.post('/login', verifyFunction(adminLogin, 'adminLogin'));
 
@@ -279,6 +283,299 @@ router.delete('/sessions/cleanup', adminAuth, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: 'Failed to cleanup sessions',
+      details: error.message 
+    });
+  }
+});
+
+// Get all Manage Expense submissions
+router.get('/manage-expenses', async (req, res) => {
+  try {
+    const submissions = await ManageExpense.find()
+      .populate('userId', 'email username')
+      .sort({ submittedAt: -1 });
+
+    const stats = {
+      total: submissions.length,
+      pending: submissions.filter(s => s.status === 'pending').length,
+      approved: submissions.filter(s => s.status === 'approved').length,
+      rejected: submissions.filter(s => s.status === 'rejected').length
+    };
+
+    res.json({
+      success: true,
+      count: submissions.length,
+      stats,
+      data: submissions
+    });
+  } catch (error) {
+    console.error('Error fetching manage expense submissions:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch submissions',
+      details: error.message 
+    });
+  }
+});
+
+// Get all Income Tax Help submissions
+router.get('/income-tax-help', async (req, res) => {
+  try {
+    const submissions = await IncomeTaxHelp.find()
+      .populate('userId', 'email username')
+      .sort({ submittedAt: -1 });
+
+    const stats = {
+      total: submissions.length,
+      pending: submissions.filter(s => s.status === 'pending').length,
+      inProgress: submissions.filter(s => s.status === 'in-progress').length,
+      completed: submissions.filter(s => s.status === 'completed').length
+    };
+
+    res.json({
+      success: true,
+      count: submissions.length,
+      stats,
+      data: submissions
+    });
+  } catch (error) {
+    console.error('Error fetching income tax help submissions:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch submissions',
+      details: error.message 
+    });
+  }
+});
+
+// Get dashboard statistics including both forms
+router.get('/dashboard-stats', async (req, res) => {
+  try {
+    const [manageExpenses, incomeTaxHelp] = await Promise.all([
+      ManageExpense.find(),
+      IncomeTaxHelp.find()
+    ]);
+
+    const stats = {
+      manageExpenses: {
+        total: manageExpenses.length,
+        pending: manageExpenses.filter(s => s.status === 'pending').length,
+        approved: manageExpenses.filter(s => s.status === 'approved').length,
+        rejected: manageExpenses.filter(s => s.status === 'rejected').length,
+        totalAmount: manageExpenses.reduce((sum, item) => sum + (item.annualExpense || 0), 0)
+      },
+      incomeTaxHelp: {
+        total: incomeTaxHelp.length,
+        pending: incomeTaxHelp.filter(s => s.status === 'pending').length,
+        inProgress: incomeTaxHelp.filter(s => s.status === 'in-progress').length,
+        completed: incomeTaxHelp.filter(s => s.status === 'completed').length,
+        totalIncome: incomeTaxHelp.reduce((sum, item) => sum + (item.annualIncome || 0), 0)
+      },
+      recentSubmissions: {
+        manageExpenses: manageExpenses.slice(0, 5),
+        incomeTaxHelp: incomeTaxHelp.slice(0, 5)
+      }
+    };
+
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch dashboard statistics',
+      details: error.message 
+    });
+  }
+});
+
+// Update Manage Expense status
+router.patch('/manage-expenses/:id/status', async (req, res) => {
+  try {
+    const { status } = req.body;
+    const { id } = req.params;
+
+    if (!['pending', 'approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid status. Must be: pending, approved, or rejected' 
+      });
+    }
+
+    const updated = await ManageExpense.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true }
+    ).populate('userId', 'email username');
+
+    if (!updated) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Submission not found' 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Status updated successfully', 
+      data: updated 
+    });
+  } catch (error) {
+    console.error('Error updating manage expense status:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to update status',
+      details: error.message 
+    });
+  }
+});
+
+// Update Income Tax Help status
+router.patch('/income-tax-help/:id/status', async (req, res) => {
+  try {
+    const { status } = req.body;
+    const { id } = req.params;
+
+    if (!['pending', 'in-progress', 'completed'].includes(status)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid status. Must be: pending, in-progress, or completed' 
+      });
+    }
+
+    const updated = await IncomeTaxHelp.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true }
+    ).populate('userId', 'email username');
+
+    if (!updated) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Submission not found' 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Status updated successfully', 
+      data: updated 
+    });
+  } catch (error) {
+    console.error('Error updating income tax help status:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to update status',
+      details: error.message 
+    });
+  }
+});
+
+// Delete Manage Expense submission
+router.delete('/manage-expenses/:id', async (req, res) => {
+  try {
+    const deleted = await ManageExpense.findByIdAndDelete(req.params.id);
+    
+    if (!deleted) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Submission not found' 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Submission deleted successfully',
+      data: deleted 
+    });
+  } catch (error) {
+    console.error('Error deleting manage expense submission:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to delete submission',
+      details: error.message 
+    });
+  }
+});
+
+// Delete Income Tax Help submission
+router.delete('/income-tax-help/:id', async (req, res) => {
+  try {
+    const deleted = await IncomeTaxHelp.findByIdAndDelete(req.params.id);
+    
+    if (!deleted) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Submission not found' 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Submission deleted successfully',
+      data: deleted 
+    });
+  } catch (error) {
+    console.error('Error deleting income tax help submission:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to delete submission',
+      details: error.message 
+    });
+  }
+});
+
+// Get single Manage Expense submission by ID
+router.get('/manage-expenses/:id', async (req, res) => {
+  try {
+    const submission = await ManageExpense.findById(req.params.id)
+      .populate('userId', 'email username');
+    
+    if (!submission) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Submission not found' 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      data: submission 
+    });
+  } catch (error) {
+    console.error('Error fetching manage expense submission:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch submission',
+      details: error.message 
+    });
+  }
+});
+
+// Get single Income Tax Help submission by ID
+router.get('/income-tax-help/:id', async (req, res) => {
+  try {
+    const submission = await IncomeTaxHelp.findById(req.params.id)
+      .populate('userId', 'email username');
+    
+    if (!submission) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Submission not found' 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      data: submission 
+    });
+  } catch (error) {
+    console.error('Error fetching income tax help submission:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch submission',
       details: error.message 
     });
   }

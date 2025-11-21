@@ -14,7 +14,15 @@ import {
   CircularProgress,
   Chip,
   Divider,
-  LinearProgress
+  LinearProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
+  Tooltip
 } from '@mui/material'
 import {
   TrendingUp,
@@ -24,7 +32,14 @@ import {
   Refresh,
   Error as ErrorIcon,
   ArrowUpward,
-  ArrowDownward
+  ArrowDownward,
+  Description,
+  AccountBalance,
+  CheckCircle,
+  Cancel,
+  HourglassEmpty,
+  Visibility,
+  Download
 } from '@mui/icons-material'
 import {
   LineChart,
@@ -37,7 +52,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
   Area,
@@ -93,6 +108,8 @@ const Dashboard = () => {
   const [trendData, setTrendData] = useState([])
   const [categoryData, setCategoryData] = useState([])
   const [monthlyData, setMonthlyData] = useState([])
+  const [manageExpenseData, setManageExpenseData] = useState({ submissions: [], stats: {} })
+  const [incomeTaxHelpData, setIncomeTaxHelpData] = useState({ submissions: [], stats: {} })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [retryCount, setRetryCount] = useState(0)
@@ -203,6 +220,36 @@ const Dashboard = () => {
         setMonthlyData(mockMonthly)
       }
 
+      // Fetch Manage Expense submissions
+      try {
+        console.log('Fetching manage expense submissions...')
+        const manageExpenseRes = await api.get('/admin/manage-expenses')
+        console.log('Manage Expense response:', manageExpenseRes.data)
+        
+        setManageExpenseData({
+          submissions: manageExpenseRes.data?.data || [],
+          stats: manageExpenseRes.data?.stats || {}
+        })
+      } catch (manageExpenseError) {
+        console.error('Failed to fetch manage expense submissions:', manageExpenseError)
+        setManageExpenseData({ submissions: [], stats: {} })
+      }
+
+      // Fetch Income Tax Help submissions
+      try {
+        console.log('Fetching income tax help submissions...')
+        const incomeTaxHelpRes = await api.get('/admin/income-tax-help')
+        console.log('Income Tax Help response:', incomeTaxHelpRes.data)
+        
+        setIncomeTaxHelpData({
+          submissions: incomeTaxHelpRes.data?.data || [],
+          stats: incomeTaxHelpRes.data?.stats || {}
+        })
+      } catch (incomeTaxHelpError) {
+        console.error('Failed to fetch income tax help submissions:', incomeTaxHelpError)
+        setIncomeTaxHelpData({ submissions: [], stats: {} })
+      }
+
       setLastFetchTime(new Date())
       setError(null)
       
@@ -293,6 +340,36 @@ const Dashboard = () => {
     if (error.status >= 500) return 'error'
     if (error.status >= 400) return 'warning'
     return 'error'
+  }
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'approved':
+      case 'completed':
+        return <CheckCircle sx={{ color: 'success.main', fontSize: 20 }} />
+      case 'rejected':
+        return <Cancel sx={{ color: 'error.main', fontSize: 20 }} />
+      case 'in-progress':
+        return <HourglassEmpty sx={{ color: 'warning.main', fontSize: 20 }} />
+      case 'pending':
+      default:
+        return <HourglassEmpty sx={{ color: 'info.main', fontSize: 20 }} />
+    }
+  }
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'approved':
+      case 'completed':
+        return 'success'
+      case 'rejected':
+        return 'error'
+      case 'in-progress':
+        return 'warning'
+      case 'pending':
+      default:
+        return 'info'
+    }
   }
 
   if (loading) {
@@ -414,23 +491,112 @@ const Dashboard = () => {
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
-            title="Total Amount"
-            value={`$${(stats.totalAmount || 0).toLocaleString()}`}
-            icon={<AttachMoney fontSize="large" />}
-            color="#00c853"
-            trend={12.5}
-            trendValue="vs last month"
+            title="Manage Expense Forms"
+            value={manageExpenseData.stats?.total || 0}
+            icon={<Description fontSize="large" />}
+            color="#9c27b0"
+            trend={0}
+            trendValue="submissions"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
-            title="Avg. Expense"
-            value={`$${stats.totalExpenses > 0 ? ((stats.totalAmount || 0) / stats.totalExpenses).toFixed(2) : '0.00'}`}
-            icon={<TrendingUp fontSize="large" />}
-            color="#ff6f00"
-            trend={-3.2}
-            trendValue="vs last month"
+            title="Tax Help Requests"
+            value={incomeTaxHelpData.stats?.total || 0}
+            icon={<AccountBalance fontSize="large" />}
+            color="#ff9800"
+            trend={0}
+            trendValue="submissions"
           />
+        </Grid>
+      </Grid>
+
+      {/* Form Submissions Summary */}
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        {/* Manage Expense Summary */}
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom display="flex" alignItems="center" gap={1}>
+              <Description color="primary" />
+              Manage Expense Submissions
+            </Typography>
+            <Box sx={{ mt: 2 }}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                <Typography variant="body2" color="textSecondary">Pending</Typography>
+                <Chip 
+                  label={manageExpenseData.stats?.pending || 0} 
+                  color="info" 
+                  size="small" 
+                />
+              </Box>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                <Typography variant="body2" color="textSecondary">Approved</Typography>
+                <Chip 
+                  label={manageExpenseData.stats?.approved || 0} 
+                  color="success" 
+                  size="small" 
+                />
+              </Box>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                <Typography variant="body2" color="textSecondary">Rejected</Typography>
+                <Chip 
+                  label={manageExpenseData.stats?.rejected || 0} 
+                  color="error" 
+                  size="small" 
+                />
+              </Box>
+              <Divider sx={{ my: 2 }} />
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Typography variant="body1" fontWeight="bold">Total Amount</Typography>
+                <Typography variant="h6" color="primary">
+                  ${(manageExpenseData.submissions.reduce((sum, item) => sum + (item.annualExpense || 0), 0)).toLocaleString()}
+                </Typography>
+              </Box>
+            </Box>
+          </Paper>
+        </Grid>
+
+        {/* Income Tax Help Summary */}
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom display="flex" alignItems="center" gap={1}>
+              <AccountBalance color="primary" />
+              Income Tax Help Requests
+            </Typography>
+            <Box sx={{ mt: 2 }}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                <Typography variant="body2" color="textSecondary">Pending</Typography>
+                <Chip 
+                  label={incomeTaxHelpData.stats?.pending || 0} 
+                  color="info" 
+                  size="small" 
+                />
+              </Box>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                <Typography variant="body2" color="textSecondary">In Progress</Typography>
+                <Chip 
+                  label={incomeTaxHelpData.stats?.inProgress || 0} 
+                  color="warning" 
+                  size="small" 
+                />
+              </Box>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                <Typography variant="body2" color="textSecondary">Completed</Typography>
+                <Chip 
+                  label={incomeTaxHelpData.stats?.completed || 0} 
+                  color="success" 
+                  size="small" 
+                />
+              </Box>
+              <Divider sx={{ my: 2 }} />
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Typography variant="body1" fontWeight="bold">Total Income</Typography>
+                <Typography variant="h6" color="primary">
+                  ${(incomeTaxHelpData.submissions.reduce((sum, item) => sum + (item.annualIncome || 0), 0)).toLocaleString()}
+                </Typography>
+              </Box>
+            </Box>
+          </Paper>
         </Grid>
       </Grid>
 
@@ -453,7 +619,7 @@ const Dashboard = () => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="day" />
                 <YAxis />
-                <Tooltip />
+                <RechartsTooltip />
                 <Legend />
                 <Area 
                   type="monotone" 
@@ -491,7 +657,7 @@ const Dashboard = () => {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => `$${value.toLocaleString()}`} />
+                <RechartsTooltip formatter={(value) => `$${value.toLocaleString()}`} />
               </PieChart>
             </ResponsiveContainer>
           </Paper>
@@ -509,7 +675,7 @@ const Dashboard = () => {
                 <XAxis dataKey="month" />
                 <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
                 <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
-                <Tooltip />
+                <RechartsTooltip />
                 <Legend />
                 <Bar yAxisId="left" dataKey="amount" fill="#8884d8" name="Amount ($)" />
                 <Bar yAxisId="right" dataKey="expenses" fill="#82ca9d" name="Count" />
@@ -519,46 +685,158 @@ const Dashboard = () => {
         </Grid>
       </Grid>
 
-      {/* Additional Stats Section */}
+      {/* Manage Expense Submissions Table */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        {/* Category Details */}
         <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Category Breakdown Details
-            </Typography>
-            <List>
-              {categoryData.length > 0 ? (
-                categoryData.map((category, index) => (
-                  <ListItem key={index}>
-                    <Box 
-                      sx={{ 
-                        width: 12, 
-                        height: 12, 
-                        borderRadius: '50%', 
-                        bgcolor: COLORS[index % COLORS.length],
-                        mr: 2 
-                      }} 
-                    />
-                    <ListItemText
-                      primary={
-                        <Box display="flex" justifyContent="space-between" alignItems="center">
-                          <Typography variant="body1">{category.name}</Typography>
-                          <Typography variant="body1" fontWeight="bold">
-                            ${(category.value || 0).toLocaleString()}
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="h6">
+                Recent Manage Expense Submissions
+              </Typography>
+              <Button 
+                variant="outlined" 
+                size="small"
+                onClick={() => window.location.href = '/manage-expenses'}
+              >
+                View All
+              </Button>
+            </Box>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Full Name</TableCell>
+                    <TableCell>Annual Expense</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Submitted At</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {manageExpenseData.submissions.slice(0, 5).length > 0 ? (
+                    manageExpenseData.submissions.slice(0, 5).map((submission) => (
+                      <TableRow key={submission._id}>
+                        <TableCell>{submission.fullName}</TableCell>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight="bold" color="primary">
+                            ${(submission.annualExpense || 0).toLocaleString()}
                           </Typography>
-                        </Box>
-                      }
-                      secondary={`${category.count || 0} transactions`}
-                    />
-                  </ListItem>
-                ))
-              ) : (
-                <ListItem>
-                  <ListItemText primary="No category data available" />
-                </ListItem>
-              )}
-            </List>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            icon={getStatusIcon(submission.status)}
+                            label={submission.status?.toUpperCase() || 'PENDING'}
+                            color={getStatusColor(submission.status)}
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          {new Date(submission.submittedAt).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell align="right">
+                          <Tooltip title="View Details">
+                            <IconButton size="small" color="primary">
+                              <Visibility fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Download Proof">
+                            <IconButton size="small" color="secondary">
+                              <Download fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center">
+                        <Typography color="textSecondary">
+                          No manage expense submissions yet
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* Income Tax Help Submissions Table */}
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid item xs={12}>
+          <Paper sx={{ p: 3 }}>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="h6">
+                Recent Income Tax Help Requests
+              </Typography>
+              <Button 
+                variant="outlined" 
+                size="small"
+                onClick={() => window.location.href = '/income-tax-help'}
+              >
+                View All
+              </Button>
+            </Box>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Full Name</TableCell>
+                    <TableCell>Annual Income</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Submitted At</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {incomeTaxHelpData.submissions.slice(0, 5).length > 0 ? (
+                    incomeTaxHelpData.submissions.slice(0, 5).map((submission) => (
+                      <TableRow key={submission._id}>
+                        <TableCell>{submission.fullName}</TableCell>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight="bold" color="primary">
+                            ${(submission.annualIncome || 0).toLocaleString()}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            icon={getStatusIcon(submission.status)}
+                            label={submission.status?.toUpperCase() || 'PENDING'}
+                            color={getStatusColor(submission.status)}
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          {new Date(submission.submittedAt).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell align="right">
+                          <Tooltip title="View Details">
+                            <IconButton size="small" color="primary">
+                              <Visibility fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Download Statement">
+                            <IconButton size="small" color="secondary">
+                              <Download fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center">
+                        <Typography color="textSecondary">
+                          No income tax help requests yet
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
           </Paper>
         </Grid>
       </Grid>
