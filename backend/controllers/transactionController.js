@@ -1,5 +1,9 @@
 const Transaction = require('../models/Transaction');
-const TransactionHistory = require('../models/TransactionHistory');
+const { 
+  createHistoryFromTransaction, 
+  updateHistoryFromTransaction, 
+  deleteHistoryFromTransaction 
+} = require('./transactionHistoryController');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
@@ -73,6 +77,8 @@ const transactionController = {
     try {
       const { type, category, amount, description, date, paymentMethod, icon, note } = req.body;
       
+      console.log("Creating transaction with data:", req.body);
+      
       if (!type || !category || !amount || !description || !date) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
@@ -89,22 +95,24 @@ const transactionController = {
       });
       
       const savedTransaction = await transaction.save();
+      console.log("Transaction saved successfully:", savedTransaction._id);
       
       // Automatically create entry in TransactionHistory
       try {
-        const historyEntry = new TransactionHistory({
+        const historyData = {
           userId: req.user._id,
           date: savedTransaction.date,
-          title: savedTransaction.description,
+          description: savedTransaction.description,
           amount: savedTransaction.amount,
           type: savedTransaction.type,
           category: savedTransaction.category,
           icon: icon || 'default',
           note: note || description
-        });
+        };
         
-        await historyEntry.save();
-        console.log('Transaction history created successfully');
+        console.log("Creating history entry with data:", historyData);
+        const historyEntry = await createHistoryFromTransaction(historyData);
+        console.log("History entry created successfully:", historyEntry._id);
       } catch (historyError) {
         console.error('Error creating transaction history:', historyError.message);
         // Continue even if history creation fails
@@ -112,10 +120,11 @@ const transactionController = {
       
       res.status(201).json({
         success: true,
-        message: 'Transaction created successfully',
+        message: 'Transaction created successfully and added to history',
         transaction: savedTransaction
       });
     } catch (error) {
+      console.error("Transaction creation error:", error);
       if (req.file) {
         fs.unlinkSync(req.file.path);
       }
@@ -143,6 +152,8 @@ const transactionController = {
   async updateTransaction(req, res) {
     try {
       const updateData = { ...req.body };
+      
+      console.log("Updating transaction:", req.params.id);
       
       // Get old transaction data first
       const oldTransaction = await Transaction.findOne({
@@ -174,32 +185,36 @@ const transactionController = {
         { new: true }
       );
       
+      console.log("Transaction updated successfully");
+      
       // Update TransactionHistory
       try {
-        await TransactionHistory.findOneAndUpdate(
-          {
-            userId: req.user._id,
-            title: oldTransaction.description,
-            amount: oldTransaction.amount
-          },
-          {
-            date: transaction.date,
-            title: transaction.description,
-            amount: transaction.amount,
-            type: transaction.type,
-            category: transaction.category,
-            icon: updateData.icon || 'default',
-            note: updateData.note || transaction.description
-          },
-          { new: true }
-        );
+        const historyUpdateData = {
+          userId: req.user._id,
+          oldDescription: oldTransaction.description,
+          oldAmount: oldTransaction.amount,
+          date: transaction.date,
+          description: transaction.description,
+          amount: transaction.amount,
+          type: transaction.type,
+          category: transaction.category,
+          icon: updateData.icon || 'default',
+          note: updateData.note || transaction.description
+        };
+        
+        await updateHistoryFromTransaction(historyUpdateData);
         console.log('Transaction history updated successfully');
       } catch (historyError) {
         console.error('Error updating transaction history:', historyError.message);
       }
       
-      res.json(transaction);
+      res.json({
+        success: true,
+        message: 'Transaction updated successfully',
+        transaction: transaction
+      });
     } catch (error) {
+      console.error("Transaction update error:", error);
       if (req.file) {
         fs.unlinkSync(req.file.path);
       }
@@ -209,6 +224,8 @@ const transactionController = {
 
   async deleteTransaction(req, res) {
     try {
+      console.log("Deleting transaction:", req.params.id);
+      
       const transaction = await Transaction.findOneAndDelete({
         _id: req.params.id,
         userId: req.user._id
@@ -227,19 +244,25 @@ const transactionController = {
       
       // Delete from TransactionHistory
       try {
-        await TransactionHistory.findOneAndDelete({
-          userId: req.user._id,
-          title: transaction.description,
-          amount: transaction.amount,
-          type: transaction.type
-        });
+        await deleteHistoryFromTransaction(
+          req.user._id,
+          {
+            description: transaction.description,
+            amount: transaction.amount,
+            type: transaction.type
+          }
+        );
         console.log('Transaction history deleted successfully');
       } catch (historyError) {
         console.error('Error deleting transaction history:', historyError.message);
       }
       
-      res.json({ message: 'Transaction deleted successfully' });
+      res.json({ 
+        success: true,
+        message: 'Transaction and history deleted successfully' 
+      });
     } catch (error) {
+      console.error("Transaction deletion error:", error);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   },

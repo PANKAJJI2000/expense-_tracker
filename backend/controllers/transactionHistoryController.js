@@ -3,6 +3,8 @@ const TransactionHistory = require("../models/TransactionHistory");
 // Helper function to create history from transaction data
 const createHistoryFromTransaction = async (transactionData) => {
   try {
+    console.log("Creating transaction history with data:", transactionData);
+    
     const historyEntry = new TransactionHistory({
       userId: transactionData.userId,
       date: transactionData.date,
@@ -14,7 +16,9 @@ const createHistoryFromTransaction = async (transactionData) => {
       note: transactionData.note || transactionData.description
     });
     
-    return await historyEntry.save();
+    const saved = await historyEntry.save();
+    console.log("Transaction history created successfully:", saved._id);
+    return saved;
   } catch (error) {
     console.error("Error creating transaction history:", error);
     throw error;
@@ -24,6 +28,8 @@ const createHistoryFromTransaction = async (transactionData) => {
 // Helper function to update history from transaction data
 const updateHistoryFromTransaction = async (transactionData) => {
   try {
+    console.log("Updating transaction history with data:", transactionData);
+    
     const updated = await TransactionHistory.findOneAndUpdate(
       { 
         userId: transactionData.userId,
@@ -42,6 +48,12 @@ const updateHistoryFromTransaction = async (transactionData) => {
       { new: true }
     );
     
+    if (updated) {
+      console.log("Transaction history updated successfully:", updated._id);
+    } else {
+      console.log("No matching transaction history found to update");
+    }
+    
     return updated;
   } catch (error) {
     console.error("Error updating transaction history:", error);
@@ -52,12 +64,20 @@ const updateHistoryFromTransaction = async (transactionData) => {
 // Helper function to delete history from transaction data
 const deleteHistoryFromTransaction = async (userId, transactionData) => {
   try {
+    console.log("Deleting transaction history for:", transactionData.description);
+    
     const deleted = await TransactionHistory.findOneAndDelete({
       userId: userId,
       title: transactionData.description,
       amount: transactionData.amount,
       type: transactionData.type
     });
+    
+    if (deleted) {
+      console.log("Transaction history deleted successfully:", deleted._id);
+    } else {
+      console.log("No matching transaction history found to delete");
+    }
     
     return deleted;
   } catch (error) {
@@ -165,6 +185,6 @@ exports.deleteTransactionHistory = async (req, res) => {
 };
 
 // Export helper functions
-exports.createHistoryFromTransaction = createHistoryFromTransaction;
-exports.updateHistoryFromTransaction = updateHistoryFromTransaction;
-exports.deleteHistoryFromTransaction = deleteHistoryFromTransaction;
+module.exports.createHistoryFromTransaction = createHistoryFromTransaction;
+module.exports.updateHistoryFromTransaction = updateHistoryFromTransaction;
+module.exports.deleteHistoryFromTransaction = deleteHistoryFromTransaction;
