@@ -152,64 +152,91 @@ exports.getProfileByUserId = async (req, res) => {
 // @access  Private
 exports.updateProfile = async (req, res) => {
   try {
-    const { name, oldEmail,email, phone, profilePic } = req.body;
+    const { name, oldEmail, email, phone, profilePic } = req.body;
 
-    console.log("    Update Profile Request Body:", req.body);
-    // Check if email is being changed and if it's already in use
-    if (email) {
+    console.log("Update Profile Request Body:", req.body);
+    console.log("Profile ID:", req.params.id);
+    
+    // First, find the profile to check if it exists
+    const existingProfile = await Profile.findById(req.params.id);
+    
+    if (!existingProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "Profile not found",
+      });
+    }
+
+    console.log("Existing Profile:", existingProfile);
+
+    // Check if email is being changed and if it's already in use by another profile
+    if (email && email !== existingProfile.email) {
       const emailExists = await Profile.findOne({
-        email,
+        email: email,
         _id: { $ne: req.params.id },
       });
       if (emailExists) {
         return res.status(400).json({
           success: false,
-          message: "Email already in use",
+          message: "Email already in use by another profile",
+        });
+      }
+
+      // Also check if email exists in User model
+      const userEmailExists = await User.findOne({
+        email: email,
+        _id: { $ne: existingProfile.userId },
+      });
+      if (userEmailExists) {
+        return res.status(400).json({
+          success: false,
+          message: "Email already in use by another user",
         });
       }
     }
 
-    const profile = await Profile.findByIdAndUpdate(
+    // Update profile
+    const updatedProfile = await Profile.findByIdAndUpdate(
       req.params.id,
       { name, email, phone, profilePic },
       {
         new: true,
         runValidators: true,
       }
-    );
+    ).populate("userId", "username email");
 
-    //
-    // const user = await User.findOneAndUpdate(
-    //   { email: email },
-    //  { $set: { name:name, email: email } },
-    //   {
-    //     new: true,
-    //     runValidators: true
-    //   }
-    // );
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-     { name:name, email: email },
-      {
-        new: true,
-        runValidators: true
-      }
-    );
-
-    // console.log("Updated User:", user);
-    if (!profile && !user) {
+    if (!updatedProfile) {
       return res.status(404).json({
         success: false,
-        message: "user Profile not found",
+        message: "Failed to update profile",
       });
+    }
+
+    console.log("Updated Profile:", updatedProfile);
+
+    // Update User model using the userId from the profile
+    if (existingProfile.userId) {
+      const updatedUser = await User.findByIdAndUpdate(
+        existingProfile.userId,
+        { name: name, email: email },
+        {
+          new: true,
+          runValidators: true
+        }
+      );
+
+      if (!updatedUser) {
+        console.warn("Warning: User update failed for userId:", existingProfile.userId);
+      }
     }
 
     res.status(200).json({
       success: true,
-      message: "user Profile updated successfully",
-      data: profile,
+      message: "User Profile updated successfully",
+      data: updatedProfile,
     });
   } catch (error) {
+    console.error("Update Profile Error:", error);
     res.status(400).json({
       success: false,
       message: error.message,

@@ -13,7 +13,7 @@ const incomeTaxHelpSchema = new mongoose.Schema({
   },
   incomeStatement: {
     type: String, // Store file path
-    required: true
+    // required: true
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,

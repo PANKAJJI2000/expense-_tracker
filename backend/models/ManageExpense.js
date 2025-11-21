@@ -13,7 +13,7 @@ const manageExpenseSchema = new mongoose.Schema({
   },
   expenseProof: {
     type: String, // Store file path
-    required: true
+    // required: true
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,

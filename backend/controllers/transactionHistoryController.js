@@ -1,5 +1,71 @@
 const TransactionHistory = require("../models/TransactionHistory");
 
+// Helper function to create history from transaction data
+const createHistoryFromTransaction = async (transactionData) => {
+  try {
+    const historyEntry = new TransactionHistory({
+      userId: transactionData.userId,
+      date: transactionData.date,
+      title: transactionData.description,
+      amount: transactionData.amount,
+      type: transactionData.type,
+      category: transactionData.category,
+      icon: transactionData.icon || 'default',
+      note: transactionData.note || transactionData.description
+    });
+    
+    return await historyEntry.save();
+  } catch (error) {
+    console.error("Error creating transaction history:", error);
+    throw error;
+  }
+};
+
+// Helper function to update history from transaction data
+const updateHistoryFromTransaction = async (transactionData) => {
+  try {
+    const updated = await TransactionHistory.findOneAndUpdate(
+      { 
+        userId: transactionData.userId,
+        title: transactionData.oldDescription || transactionData.description,
+        amount: transactionData.oldAmount || transactionData.amount
+      },
+      {
+        date: transactionData.date,
+        title: transactionData.description,
+        amount: transactionData.amount,
+        type: transactionData.type,
+        category: transactionData.category,
+        icon: transactionData.icon || 'default',
+        note: transactionData.note || transactionData.description
+      },
+      { new: true }
+    );
+    
+    return updated;
+  } catch (error) {
+    console.error("Error updating transaction history:", error);
+    throw error;
+  }
+};
+
+// Helper function to delete history from transaction data
+const deleteHistoryFromTransaction = async (userId, transactionData) => {
+  try {
+    const deleted = await TransactionHistory.findOneAndDelete({
+      userId: userId,
+      title: transactionData.description,
+      amount: transactionData.amount,
+      type: transactionData.type
+    });
+    
+    return deleted;
+  } catch (error) {
+    console.error("Error deleting transaction history:", error);
+    throw error;
+  }
+};
+
 // Create
 exports.addTransactionHistory = async (req, res) => {
   if (!req.user || !req.user.userId) {
@@ -97,3 +163,8 @@ exports.deleteTransactionHistory = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+// Export helper functions
+exports.createHistoryFromTransaction = createHistoryFromTransaction;
+exports.updateHistoryFromTransaction = updateHistoryFromTransaction;
+exports.deleteHistoryFromTransaction = deleteHistoryFromTransaction;

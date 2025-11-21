@@ -4,8 +4,11 @@ const ManageExpense = require('../models/ManageExpense');
 const { uploadExpenseProof } = require('../config/multerConfig');
 
 // Submit Manage Expense form
-router.post('/submit', uploadExpenseProof.single('expenseProof'), async (req, res) => {
+router.post('/', uploadExpenseProof.single('expenseProof'), async (req, res) => {
   try {
+
+    // console.log('Received manage expense submission:', req.body, req.file);
+
     const { fullName, annualExpense } = req.body;
 
     if (!fullName || !annualExpense) {
@@ -36,7 +39,7 @@ router.post('/submit', uploadExpenseProof.single('expenseProof'), async (req, re
 });
 
 // Get all submissions (for admin)
-router.get('/all', async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const submissions = await ManageExpense.find()
       .populate('userId', 'email username')
