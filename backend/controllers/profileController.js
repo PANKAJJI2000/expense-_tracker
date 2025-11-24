@@ -147,47 +147,44 @@ exports.getProfileByUserId = async (req, res) => {
   }
 };
 
-// @desc    Update profile
-// @route   PUT /api/profiles/:id
+// @desc    Update profile by user ID
+// @route   PUT /api/profiles/user/:userId
 // @access  Private
-exports.updateProfile = async (req, res) => {
+exports.updateProfileByUserId = async (req, res) => {
   try {
-    const { name, oldEmail, email, phone, profilePic } = req.body;
+    const { name, email, phone, profilePic } = req.body;
 
-    console.log("Update Profile Request Body:", req.body);
-    console.log("Profile ID:", req.params.id);
+    console.log("Update User Request Body:", req.body);
+    console.log("User ID:", req.params.userId);
     
-    // First, find the profile to check if it exists
-    const existingProfile = await Profile.findById(req.params.id);
+    // Validate MongoDB ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format",
+      });
+    }
     
-    if (!existingProfile) {
+    // Check if user exists
+    const existingUser = await User.findById(req.params.userId);
+    
+    if (!existingUser) {
+      console.log("User not found with ID:", req.params.userId);
       return res.status(404).json({
         success: false,
-        message: "Profile not found",
+        message: "User not found",
       });
     }
 
-    console.log("Existing Profile:", existingProfile);
+    console.log("Existing User:", existingUser);
 
-    // Check if email is being changed and if it's already in use by another profile
-    if (email && email !== existingProfile.email) {
-      const emailExists = await Profile.findOne({
+    // Check if email is being changed and if it's already in use
+    if (email && email !== existingUser.email) {
+      const emailExists = await User.findOne({
         email: email,
-        _id: { $ne: req.params.id },
+        _id: { $ne: req.params.userId },
       });
       if (emailExists) {
-        return res.status(400).json({
-          success: false,
-          message: "Email already in use by another profile",
-        });
-      }
-
-      // Also check if email exists in User model
-      const userEmailExists = await User.findOne({
-        email: email,
-        _id: { $ne: existingProfile.userId },
-      });
-      if (userEmailExists) {
         return res.status(400).json({
           success: false,
           message: "Email already in use by another user",
@@ -195,48 +192,121 @@ exports.updateProfile = async (req, res) => {
       }
     }
 
-    // Update profile
-    const updatedProfile = await Profile.findByIdAndUpdate(
-      req.params.id,
-      { name, email, phone, profilePic },
+    // Update User model only
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.userId,
+      { name, email },
       {
         new: true,
-        runValidators: true,
+        runValidators: true
       }
-    ).populate("userId", "username email");
+    );
 
-    if (!updatedProfile) {
+    if (!updatedUser) {
       return res.status(404).json({
         success: false,
-        message: "Failed to update profile",
+        message: "Failed to update user",
       });
     }
 
-    console.log("Updated Profile:", updatedProfile);
-
-    // Update User model using the userId from the profile
-    if (existingProfile.userId) {
-      const updatedUser = await User.findByIdAndUpdate(
-        existingProfile.userId,
-        { name: name, email: email },
-        {
-          new: true,
-          runValidators: true
-        }
-      );
-
-      if (!updatedUser) {
-        console.warn("Warning: User update failed for userId:", existingProfile.userId);
-      }
-    }
+    console.log("Updated User:", updatedUser);
 
     res.status(200).json({
       success: true,
-      message: "User Profile updated successfully",
-      data: updatedProfile,
+      message: "User updated successfully",
+      data: updatedUser,
     });
   } catch (error) {
-    console.error("Update Profile Error:", error);
+    console.error("Update User Error:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Update profile
+// @route   PUT /api/profiles/:id
+// @access  Private
+exports.updateProfile = async (req, res) => {
+  try {
+    const { name, email, phone, profilePic } = req.body;
+
+    console.log("Update User Request Body:", req.body);
+    console.log("Profile ID:", req.params.id);
+    
+    // Validate MongoDB ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid profile ID format",
+      });
+    }
+    
+    // Find the profile to get userId
+    const existingProfile = await Profile.findById(req.params.id);
+    
+    if (!existingProfile) {
+      console.log("Profile not found with ID:", req.params.id);
+      const allProfiles = await Profile.find({}).select('_id name email userId');
+      console.log("Available profiles:", allProfiles);
+      return res.status(404).json({
+        success: false,
+        message: `Profile not found with ID: ${req.params.id}. Please verify the profile ID.`,
+      });
+    }
+
+    console.log("Existing Profile:", existingProfile);
+
+    // Get the user
+    const existingUser = await User.findById(existingProfile.userId);
+    if (!existingUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found for this profile",
+      });
+    }
+
+    // Check if email is being changed and if it's already in use
+    if (email && email !== existingUser.email) {
+      const emailExists = await User.findOne({
+        email: email,
+        _id: { $ne: existingProfile.userId },
+      });
+      if (emailExists) {
+        return res.status(400).json({
+          success: false,
+          message: "Email already in use by another user",
+        });
+      }
+    }
+
+    // Update User model only
+    const updatedUser = await User.findByIdAndUpdate(
+      existingProfile.userId,
+      { name, email },
+      {
+        new: true,
+        runValidators: true
+      }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "Failed to update user",
+      });
+    }
+
+    console.log("Updated User:", updatedUser);
+
+    res.status(200).json({
+      success: true,
+      message: "User updated successfully",
+      data: updatedUser,
+    });
+  } catch (error) {
+    console.error("Update User Error:", error);
     res.status(400).json({
       success: false,
       message: error.message,

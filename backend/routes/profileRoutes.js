@@ -5,6 +5,7 @@ const {
   getAllProfiles,
   getProfileById,
   getProfileByUserId,
+  updateProfileByUserId,
   updateProfile,
   deleteProfile,
   getProfileByReferralCode
@@ -18,6 +19,8 @@ router.post('/', createProfile);
 router.get('/', getAllProfiles);
 router.get('/:id', getProfileById);
 router.get('/user/:userId', getProfileByUserId);
+router.put('/user/:userId', updateProfileByUserId);
+
 router.put('/:id', updateProfile);
 router.delete('/:id', deleteProfile);
 
