@@ -1156,6 +1156,199 @@ const getTopUsers = async (req, res) => {
   }
 };
 
+// Email verification management
+const { sendVerificationEmail, generateVerificationToken } = require('../utils/emailService');
+
+// Get all users with email verification status
+const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find()
+      .select('-password -emailVerificationToken -passwordResetToken')
+      .sort({ createdAt: -1 });
+    
+    const usersWithStats = users.map(user => ({
+      ...user.toObject(),
+      emailVerificationStatus: user.isEmailVerified ? 'Verified' : 'Pending',
+      verificationExpired: user.emailVerificationExpires && user.emailVerificationExpires < Date.now()
+    }));
+    
+    res.json({
+      success: true,
+      count: users.length,
+      users: usersWithStats
+    });
+  } catch (error) {
+    console.error('Get all users error:', error);
+    res.status(500).json({ error: 'Failed to fetch users', message: error.message });
+  }
+};
+
+// Manually verify user email (admin action)
+const verifyUserEmail = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (user.isEmailVerified) {
+      return res.status(400).json({ error: 'User email is already verified' });
+    }
+    
+    user.isEmailVerified = true;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpires = null;
+    await user.save();
+    
+    res.json({
+      success: true,
+      message: 'User email verified successfully',
+      user: {
+        id: user._id,
+        email: user.email,
+        isEmailVerified: user.isEmailVerified
+      }
+    });
+  } catch (error) {
+    console.error('Admin verify user email error:', error);
+    res.status(500).json({ error: 'Failed to verify user email' });
+  }
+};
+
+// Resend verification email to user (admin action)
+const resendUserVerification = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (user.isEmailVerified) {
+      return res.status(400).json({ error: 'User email is already verified' });
+    }
+    
+    // Generate new verification token
+    const verificationToken = generateVerificationToken();
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    
+    user.emailVerificationToken = verificationToken;
+    user.emailVerificationExpires = verificationExpires;
+    await user.save();
+    
+    // Send verification email
+    const emailResult = await sendVerificationEmail(user.email, verificationToken);
+    
+    if (!emailResult.success) {
+      return res.status(500).json({ error: 'Failed to send verification email' });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Verification email sent successfully',
+      user: {
+        id: user._id,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('Admin resend verification error:', error);
+    res.status(500).json({ error: 'Failed to resend verification email' });
+  }
+};
+
+// Get email verification statistics
+const getEmailVerificationStats = async (req, res) => {
+  try {
+    const totalUsers = await User.countDocuments();
+    const verifiedUsers = await User.countDocuments({ isEmailVerified: true });
+    const unverifiedUsers = await User.countDocuments({ isEmailVerified: false });
+    const expiredVerifications = await User.countDocuments({
+      isEmailVerified: false,
+      emailVerificationExpires: { $lt: Date.now() }
+    });
+    
+    res.json({
+      success: true,
+      stats: {
+        totalUsers,
+        verifiedUsers,
+        unverifiedUsers,
+        expiredVerifications,
+        verificationRate: totalUsers > 0 ? ((verifiedUsers / totalUsers) * 100).toFixed(2) : 0
+      }
+    });
+  } catch (error) {
+    console.error('Get email verification stats error:', error);
+    res.status(500).json({ error: 'Failed to get email verification statistics' });
+  }
+};
+
+// Get list of unverified users
+const getUnverifiedUsers = async (req, res) => {
+  try {
+    const unverifiedUsers = await User.find({ isEmailVerified: false })
+      .select('-password -emailVerificationToken -passwordResetToken')
+      .sort({ createdAt: -1 });
+    
+    const usersWithExpiry = unverifiedUsers.map(user => ({
+      ...user.toObject(),
+      verificationExpired: user.emailVerificationExpires && user.emailVerificationExpires < Date.now(),
+      daysUntilExpiry: user.emailVerificationExpires 
+        ? Math.ceil((user.emailVerificationExpires - Date.now()) / (1000 * 60 * 60 * 24))
+        : null
+    }));
+    
+    res.json({
+      success: true,
+      count: unverifiedUsers.length,
+      users: usersWithExpiry
+    });
+  } catch (error) {
+    console.error('Get unverified users error:', error);
+    res.status(500).json({ error: 'Failed to get unverified users' });
+  }
+};
+
+// Bulk verify users
+const bulkVerifyUsers = async (req, res) => {
+  try {
+    const { userIds } = req.body;
+    
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ error: 'User IDs array is required' });
+    }
+    
+    const result = await User.updateMany(
+      { 
+        _id: { $in: userIds },
+        isEmailVerified: false
+      },
+      {
+        $set: {
+          isEmailVerified: true,
+          emailVerificationToken: null,
+          emailVerificationExpires: null
+        }
+      }
+    );
+    
+    res.json({
+      success: true,
+      message: `${result.modifiedCount} users verified successfully`,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (error) {
+    console.error('Bulk verify users error:', error);
+    res.status(500).json({ error: 'Failed to bulk verify users' });
+  }
+};
+
 module.exports = {
   adminLogin,
   verifyAdmin,
@@ -1186,11 +1379,18 @@ module.exports = {
   // Transaction History routes
   getTransactionHistory,
   deleteTransactionHistory,
-  // Admin dashboard specific routes - NOW EXPORTED
+  // Admin dashboard specific routes
   getStats,
   getUpdatedExpenses,
   getTrends,
   getCategoryStats,
   getMonthlyStats,
-  getTopUsers
+  getTopUsers,
+  // Email verification management
+  getAllUsers,
+  verifyUserEmail,
+  resendUserVerification,
+  getEmailVerificationStats,
+  getUnverifiedUsers,
+  bulkVerifyUsers
 };

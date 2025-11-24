@@ -11,9 +11,12 @@ router.post('/signin/linkedin', authController.linkedinSignin);
 router.post('/signin/google', authController.googleSignin);
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password/:token', authController.resetPassword);
+router.post('/verify-email', authController.verifyEmail);
+router.post('/resend-verification', authController.resendVerificationEmail);
 
 // Protected routes - require authentication
 router.get('/profile', authMiddleware, authController.getProfile);
 router.get('/me', authMiddleware, authController.getProfile); // Alternative route
+router.post('/change-password', authMiddleware, authController.changePassword);
 
 module.exports = router;

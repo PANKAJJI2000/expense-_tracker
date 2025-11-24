@@ -57,19 +57,53 @@ const TransactionHistory = () => {
       if (dateRange.start) params.append('startDate', dateRange.start)
       if (dateRange.end) params.append('endDate', dateRange.end)
       
-      const response = await api.get(`/admin/transaction-history?${params}`)
-      setHistory(response.data.histories || response.data || [])
       
-      setSnackbar({
-        open: true,
-        message: 'Transaction history loaded successfully',
-        severity: 'success'
-      })
+      console.log('Fetching transaction history with params:', params.toString())
+      
+      // Try multiple endpoints to ensure compatibility
+      let response
+      try {
+        // response = await api.get(`/transaction-history?${params}`)
+        response = await api.get(`/admin/transactions?${params}`)
+      } catch (err) {
+        console.log('Trying admin endpoint...')
+        response = await api.get(`/admin/transaction-history?${params}`)
+      }
+      
+      console.log('Transaction history response:', response.data)
+      
+      // Handle different response formats
+      let historyData = []
+      if (Array.isArray(response.data)) {
+        historyData = response.data
+      } else if (response.data.histories) {
+        historyData = response.data.histories
+      } else if (response.data.data) {
+        historyData = response.data.data
+      }
+      
+      console.log('Processed history data:', historyData.length, 'items')
+      setHistory(historyData)
+      
+      if (historyData.length > 0) {
+        setSnackbar({
+          open: true,
+          message: `${historyData.length} transaction history items loaded`,
+          severity: 'success'
+        })
+      } else {
+        setSnackbar({
+          open: true,
+          message: 'No transaction history found',
+          severity: 'info'
+        })
+      }
     } catch (error) {
       console.error('Failed to fetch transaction history:', error)
+      console.error('Error details:', error.response?.data)
       setSnackbar({
         open: true,
-        message: 'Failed to load transaction history',
+        message: error.response?.data?.error || 'Failed to load transaction history',
         severity: 'error'
       })
       setHistory([])
@@ -224,78 +258,74 @@ const TransactionHistory = () => {
                 paginatedHistory.map((item) => (
                   <TableRow key={item._id}>
                     <TableCell sx={{ fontSize: '0.75rem', maxWidth: 120 }}>
-                      {item._id}
+                      {item._id?.substring(0, 8) || 'N/A'}...
                     </TableCell>
-                    <TableCell>{item.title || 'N/A'}</TableCell>
+                    <TableCell>{item.title || item.description || 'N/A'}</TableCell>
                     <TableCell>
                       <Chip
                         label={item.type || 'N/A'}
-                        color={item.type === 'income' ? 'success' : 'error'}
+                        color={item.type === 'income' ? 'success' : item.type === 'expense' ? 'error' : 'default'}
                         size="small"
                       />
                     </TableCell>
-                    <TableCell>{item.category || 'N/A'}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={item.category || 'N/A'}
+                        variant="outlined"
+                        size="small"
+                      />
+                    </TableCell>
                     <TableCell>
                       <Typography
                         color={item.type === 'income' ? 'success.main' : 'error.main'}
                         fontWeight="bold"
                       >
-                        {item.type === 'income' ? '+' : '-'}${item.amount?.toFixed(2) || '0.00'}
+                        {item.type === 'income' ? '+' : '-'}$
+                        {typeof item.amount === 'number' ? item.amount.toFixed(2) : '0.00'}
                       </Typography>
                     </TableCell>
-                    <TableCell>{item.userId?.name || item.userId?.email || 'N/A'}</TableCell>
-                    <TableCell sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {item.note || '-'}
-                    </TableCell>
                     <TableCell>
-                      {item.date ? new Date(item.date).toLocaleDateString() : 'N/A'}
+                      {item.userId?.name || item.userId?.email || item.userId || 'N/A'}
                     </TableCell>
-                    <TableCell>
-                      <Box>
-                        <IconButton size="small" title="View Details">
-                          <Visibility />
-                        </IconButton>
-                        <IconButton 
-                          onClick={() => handleDelete(item._id)} 
-                          size="small"
-                          title="Delete"
-                          color="error"
-                        >
-                          <Delete />
-                        </IconButton>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        
-        {totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
-            <Pagination
-              count={totalPages}
-              page={page}
-              onChange={(event, newPage) => setPage(newPage)}
-              color="primary"
-            />
-          </Box>
-        )}
-      </Paper>
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Box>
-  )
-}
-
-export default TransactionHistory
+                                        <TableCell sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {item.note || item.description || '-'}
+                                        </TableCell>
+                                        <TableCell>
+                                          {new Date(item.date).toLocaleDateString()}
+                                        </TableCell>
+                                        <TableCell>
+                                          <IconButton size="small" onClick={() => handleDelete(item._id)}>
+                                            <Delete fontSize="small" />
+                                          </IconButton>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))
+                                  )}
+                                </TableBody>
+                              </Table>
+                            </TableContainer>
+                            {totalPages > 1 && (
+                              <Pagination
+                                count={totalPages}
+                                page={page}
+                                onChange={(e, value) => setPage(value)}
+                                sx={{ p: 2, display: 'flex', justifyContent: 'center' }}
+                              />
+                            )}
+                          </Paper>
+                    
+                          <Snackbar
+                            open={snackbar.open}
+                            autoHideDuration={6000}
+                            onClose={handleCloseSnackbar}
+                            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                          >
+                            <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+                              {snackbar.message}
+                            </Alert>
+                          </Snackbar>
+                        </Box>
+                      )
+                    }
+                    
+                    export default TransactionHistory

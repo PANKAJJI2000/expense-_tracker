@@ -122,8 +122,11 @@ app.get('/api/health', (req, res) => {
       manageExpenses: `${baseUrl}/api/manage-expenses`,
       incomeTaxHelp: `${baseUrl}/api/income-tax-help`,
       adminSessions: `${baseUrl}/api/admin/sessions`,
-      sessionStats: `${baseUrl}/api/admin/sessions/stats`
-      
+      sessionStats: `${baseUrl}/api/admin/sessions/stats`,
+      emailVerificationStats: `${baseUrl}/api/admin/email-verification/stats`,
+      unverifiedUsers: `${baseUrl}/api/admin/users/unverified`,
+      verifyEmail: `${baseUrl}/api/auth/verify-email`,
+      resendVerification: `${baseUrl}/api/auth/resend-verification`
     }
   });
 });
@@ -261,7 +264,9 @@ app.get('/', (req, res) => {
       adminSessions: `${baseUrl}/api/admin/sessions`,
       sessionStats: `${baseUrl}/api/admin/sessions/stats`,
       debugSchemas: `${baseUrl}/api/admin/debug-schemas`,
-      debugTransactionHistory: `${baseUrl}/api/admin/debug-transaction-history`
+      debugTransactionHistory: `${baseUrl}/api/admin/debug-transaction-history`,
+      emailVerificationStats: `${baseUrl}/api/admin/email-verification/stats`,
+      unverifiedUsers: `${baseUrl}/api/admin/users/unverified`
     }
   });
 });
@@ -312,6 +317,62 @@ app.post('/api/session/destroy', (req, res) => {
     res.json({ message: 'No active session' });
   }
 });
+
+// Development only - Get verification token for testing
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/api/dev/get-token/:email', async (req, res) => {
+    try {
+      const User = require('./models/User');
+      const user = await User.findOne({ email: req.params.email })
+        .select('email emailVerificationToken emailVerificationExpires isEmailVerified');
+      
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      res.json({
+        email: user.email,
+        token: user.emailVerificationToken,
+        expires: user.emailVerificationExpires,
+        isVerified: user.isEmailVerified
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Get password reset token for testing
+  app.get('/api/dev/get-reset-token/:email', async (req, res) => {
+    try {
+      const User = require('./models/User');
+      const user = await User.findOne({ email: req.params.email })
+        .select('email passwordResetToken passwordResetExpires');
+      
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      res.json({
+        email: user.email,
+        resetToken: user.passwordResetToken,
+        expires: user.passwordResetExpires,
+        hasResetToken: !!user.passwordResetToken
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Test auth middleware
+  const authMiddleware = require('./middleware/authMiddleware');
+  app.get('/api/dev/test-auth', authMiddleware, (req, res) => {
+    res.json({
+      authenticated: true,
+      user: req.user,
+      message: 'Authentication working'
+    });
+  });
+}
 
 // 404 handler - must be last
 app.all('*', (req, res) => {

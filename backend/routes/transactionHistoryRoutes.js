@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 // @desc    Get all transactions for a user
 // @route   GET /api/transaction-history/:userId
 // @access  Public
+
 router.get('/:userId', async (req, res) => {
   try {
     const userId = req.params.userId;

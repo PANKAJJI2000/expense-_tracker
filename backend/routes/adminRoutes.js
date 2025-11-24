@@ -581,6 +581,13 @@ router.get('/income-tax-help/:id', async (req, res) => {
   }
 });
 
+// Email verification management routes
+router.get('/email-verification/stats', adminController.getEmailVerificationStats);
+router.get('/users/unverified', adminController.getUnverifiedUsers);
+router.post('/users/:userId/verify-email', adminController.verifyUserEmail);
+router.post('/users/:userId/resend-verification', adminController.resendUserVerification);
+router.post('/users/bulk-verify', adminController.bulkVerifyUsers);
+
 console.log('✓ Admin routes configured successfully');
 
 module.exports = router;

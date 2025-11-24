@@ -1,9 +1,10 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const axios = require('axios');
+const crypto = require('crypto');
 const User = require('../models/User');
+const { generateVerificationToken, sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail } = require('../utils/emailService');
 
 const authController = {
   async signup(req, res) {
@@ -55,10 +56,27 @@ const authController = {
         { expiresIn: '7d' }
       );
 
+      // Generate verification token
+      const verificationToken = generateVerificationToken();
+      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      
+      // Update user with verification token
+      user.emailVerificationToken = verificationToken;
+      user.emailVerificationExpires = verificationExpires;
+      await user.save();
+      
+      // Send verification email
+      const emailResult = await sendVerificationEmail(email, verificationToken);
+      
+      if (!emailResult.success) {
+        console.error('Failed to send verification email:', emailResult.error);
+        // Don't fail signup if email fails, just log it
+      }
+      
       // Return success response with all user data
      res.status(201).json({
         success: true,
-        message: "User registered successfully",
+        message: "User registered successfully. Please check your email to verify your account.",
         data: {
           user: {
             id: user._id,
@@ -514,6 +532,260 @@ const authController = {
         error: error.message,
       });
     }
+  },
+
+  async verifyEmail(req, res) {
+    try {
+      const { token } = req.body;
+      
+      if (!token) {
+        return res.status(400).json({ error: 'Verification token is required' });
+      }
+      
+      const user = await User.findOne({
+        emailVerificationToken: token,
+        emailVerificationExpires: { $gt: Date.now() }
+      });
+      
+      if (!user) {
+        return res.status(400).json({ error: 'Invalid or expired verification token' });
+      }
+      
+      user.isEmailVerified = true;
+      user.emailVerificationToken = null;
+      user.emailVerificationExpires = null;
+      await user.save();
+      
+      res.json({ 
+        message: 'Email verified successfully',
+        user: {
+          id: user._id,
+          email: user.email,
+          isEmailVerified: user.isEmailVerified
+        }
+      });
+    } catch (error) {
+      console.error('Email verification error:', error);
+      res.status(500).json({ error: 'Email verification failed' });
+    }
+  },
+
+  async resendVerificationEmail(req, res) {
+    try {
+      const { email } = req.body;
+      
+      const user = await User.findOne({ email });
+      
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      if (user.isEmailVerified) {
+        return res.status(400).json({ error: 'Email already verified' });
+      }
+      
+      // Generate new verification token
+      const verificationToken = generateVerificationToken();
+      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      
+      user.emailVerificationToken = verificationToken;
+      user.emailVerificationExpires = verificationExpires;
+      await user.save();
+      
+      // Send verification email
+      const emailResult = await sendVerificationEmail(email, verificationToken);
+      
+      if (!emailResult.success) {
+        return res.status(500).json({ error: 'Failed to send verification email' });
+      }
+      
+      res.json({ message: 'Verification email sent successfully' });
+    } catch (error) {
+      console.error('Resend verification email error:', error);
+      res.status(500).json({ error: 'Failed to resend verification email' });
+    }
+  },
+
+  // Request password reset
+  forgotPassword: async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: 'Email is required' });
+      }
+      
+      const user = await User.findOne({ email });
+      
+      if (!user) {
+        // Don't reveal if user exists or not for security
+        return res.json({ message: 'If the email exists, a password reset link has been sent' });
+      }
+      
+      // Generate password reset token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+      const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      
+      user.passwordResetToken = resetTokenHash;
+      user.passwordResetExpires = resetExpires;
+      await user.save();
+      
+      // Send password reset email
+      const emailResult = await sendPasswordResetEmail(email, resetToken);
+      
+      if (!emailResult.success) {
+        console.error('Failed to send password reset email:', emailResult.error);
+        return res.status(500).json({ error: 'Failed to send password reset email' });
+      }
+      
+      res.json({ message: 'Password reset email sent successfully' });
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      res.status(500).json({ error: 'Failed to process password reset request' });
+    }
+  },
+
+  // Reset password with token
+  resetPassword: async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { password, confirmPassword } = req.body;
+      
+      if (!password || !confirmPassword) {
+        return res.status(400).json({ error: 'Password and confirm password are required' });
+      }
+      
+      if (password !== confirmPassword) {
+        return res.status(400).json({ error: 'Passwords do not match' });
+      }
+      
+      if (password.length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+      }
+      
+      // Hash the token from URL
+      const resetTokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      
+      const user = await User.findOne({
+        passwordResetToken: resetTokenHash,
+        passwordResetExpires: { $gt: Date.now() }
+      });
+      
+      if (!user) {
+        return res.status(400).json({ error: 'Invalid or expired password reset token' });
+      }
+      
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(password, 12);
+      
+      user.password = hashedPassword;
+      user.passwordResetToken = null;
+      user.passwordResetExpires = null;
+      await user.save();
+      
+      // Optionally send confirmation email
+      try {
+        await sendPasswordChangedEmail(user.email);
+      } catch (emailError) {
+        console.error('Failed to send password changed email:', emailError);
+      }
+      
+      res.json({ message: 'Password reset successfully' });
+    } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ error: 'Failed to reset password' });
+    }
+  },
+
+  // Change password (for logged-in users)
+  changePassword: async (req, res) => {
+    try {
+      console.log('Change password request received');
+      console.log('Request body:', req.body);
+      console.log('User from middleware:', req.user);
+      console.log('Session user:', req.session?.user);
+      const { currentPassword, newPassword, confirmNewPassword } = req.body;
+      const userId = req.user?.userId || req.session?.user?.userId;
+      console.log('/n session', req.session);
+      
+      console.log('User ID:', userId);
+      
+      if (!userId) {
+        console.log('No user ID found - not authenticated');
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      
+      if (!currentPassword || !newPassword || !confirmNewPassword) {
+        console.log('Missing required fields');
+        return res.status(400).json({ error: 'All password fields are required' });
+      }
+      
+      if (newPassword !== confirmNewPassword) {
+        console.log('New passwords do not match');
+        return res.status(400).json({ error: 'New passwords do not match' });
+      }
+      
+      if (newPassword.length < 6) {
+        console.log('Password too short');
+        return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+      }
+      
+      const user = await User.findById(userId).select('+password');
+      
+      if (!user) {
+        console.log('User not found in database');
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      console.log('User found:', user.email);
+      
+
+      // Check password
+      const isValidPassword = await user.comparePassword(currentPassword);
+      
+      // const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+      
+      if (!isValidPassword) {
+        console.log('Current password is incorrect');
+        return res.status(400).json({ error: 'Current password is incorrect' });
+      }
+      
+      console.log('Current password verified');
+      
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 12);
+      user.password = hashedPassword;
+      await user.save();
+      
+      console.log('Password updated successfully');
+      
+      // Optionally send confirmation email
+      try {
+        if (sendPasswordChangedEmail) {
+          await sendPasswordChangedEmail(user.email);
+          console.log('Password changed email sent');
+        }
+      } catch (emailError) {
+        console.error('Failed to send password changed email:', emailError);
+      }
+      
+      res.json({ 
+        success: true,
+        message: 'Password changed successfully' 
+      });
+    } catch (error) {
+      console.error('Change password error:', error);
+      console.error('Error stack:', error.stack);
+      res.status(500).json({ 
+        error: 'Failed to change password',
+        details: error.message 
+      });
+    }
+  },
+
+  async test(req, res) {
+    res.json({ message: 'Auth controller is working' });
   }
 };
 
