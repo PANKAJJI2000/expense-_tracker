@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "cross-env NODE_OPTIONS=--max-old-space-size=4096 vite build",
+    "build:prod": "cross-env NODE_ENV=production vite build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -21,5 +22,8 @@
     "@vitejs/plugin-react": "^4.0.0",
     "terser": "^5.44.0",
     "vite": "^4.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
