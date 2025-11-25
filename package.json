@@ -1,0 +1,9 @@
+{
+  "name": "expense-tracker-monorepo",
+  "version": "1.0.0",
+  "scripts": {
+    "install:admin": "cd admin-panel && npm install",
+    "build:admin": "cd admin-panel && npm run build",
+    "build": "npm run install:admin && npm run build:admin"
+  }
+}
