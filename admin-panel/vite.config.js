@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
   build: {
     outDir: 'dist',
@@ -9,11 +9,15 @@ export default defineConfig({
     minify: 'terser'
   },
   define: {
-    // 'process.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL || 'http://localhost:3000')
     'process.env.VITE_API_URL': JSON.stringify(
-    process.env.NODE_ENV === 'production'
-      ? 'https://expense-tracker-backend-48vm.onrender.com/api'
-      : 'http://localhost:3000/api'
-  )
+      mode === 'production'
+        ? 'https://expense-tracker-backend-48vm.onrender.com/api'
+        : 'http://localhost:3000/api'
+    )
+  },
+  server: {
+    headers: {
+      'Cache-Control': 'no-store',
+    },
   }
-})
+}))

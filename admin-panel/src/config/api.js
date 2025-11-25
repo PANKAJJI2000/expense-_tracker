@@ -1,8 +1,12 @@
 import axios from 'axios'
 
 // Get base URL from environment or use default
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+const BASE_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.MODE === 'production' 
+    ? 'https://expense-tracker-backend-48vm.onrender.com/api'
+    : 'http://localhost:3000/api')
 
+console.log('Current Mode:', import.meta.env.MODE)
 console.log('API Base URL:', BASE_URL)
 
 const api = axios.create({
