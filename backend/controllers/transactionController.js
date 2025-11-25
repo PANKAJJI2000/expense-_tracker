@@ -75,53 +75,82 @@ const transactionController = {
 
   async createTransaction(req, res) {
     try {
-      const { type, category, amount, description, date, paymentMethod, icon, note } = req.body;
+      const { type, category, amount, description, date, paymentMethod, icon, note, item } = req.body;
       
       console.log("Creating transaction with data:", req.body);
       
-      if (!type || !category || !amount || !description || !date) {
-        return res.status(400).json({ error: 'Missing required fields' });
+      // Check for required fields
+      const missingFields = [];
+      if (!type) missingFields.push('type');
+      if (!category) missingFields.push('category');
+      if (!amount) missingFields.push('amount');
+      if (!description && !item) missingFields.push('description or item');
+      if (!date) missingFields.push('date');
+      
+      if (missingFields.length > 0) {
+        return res.status(400).json({ 
+          error: 'Missing required fields',
+          missingFields: missingFields,
+          message: `Please provide: ${missingFields.join(', ')}`
+        });
       }
       
-      const transaction = new Transaction({
+      const transactionData = {
         userId: req.user._id,
         type,
         category,
         amount: parseFloat(amount),
-        description,
         date: new Date(date),
         paymentMethod: paymentMethod || 'cash',
         invoice: req.file ? `/uploads/invoices/${req.file.filename}` : null
-      });
+      };
+      
+      // Handle item and description fields
+      if (item) transactionData.item = item;
+      if (description) transactionData.description = description;
+      if (!item && description) transactionData.item = description;
+      if (!description && item) transactionData.description = item;
+      
+      const transaction = new Transaction(transactionData);
       
       const savedTransaction = await transaction.save();
       console.log("Transaction saved successfully:", savedTransaction._id);
       
       // Automatically create entry in TransactionHistory
+      let historyCreated = false;
       try {
         const historyData = {
           userId: req.user._id,
           date: savedTransaction.date,
-          description: savedTransaction.description,
+          description: savedTransaction.description || savedTransaction.item,
           amount: savedTransaction.amount,
           type: savedTransaction.type,
           category: savedTransaction.category,
-          icon: icon || 'default',
-          note: note || description
+          icon: icon || '💰',
+          note: note || savedTransaction.description || savedTransaction.item,
+          paymentMethod: savedTransaction.paymentMethod,
+          status: 'completed'
         };
         
-        console.log("Creating history entry with data:", historyData);
+        console.log("Creating history entry with data:", JSON.stringify(historyData, null, 2));
         const historyEntry = await createHistoryFromTransaction(historyData);
-        console.log("History entry created successfully:", historyEntry._id);
+        
+        if (historyEntry) {
+          console.log("History entry created successfully:", historyEntry._id);
+          historyCreated = true;
+        }
       } catch (historyError) {
-        console.error('Error creating transaction history:', historyError.message);
-        // Continue even if history creation fails
+        console.error('Error creating transaction history:', historyError);
+        console.error('History error details:', historyError.message);
       }
       
       res.status(201).json({
         success: true,
-        message: 'Transaction created successfully and added to history',
-        transaction: savedTransaction
+        message: historyCreated 
+          ? 'Transaction created successfully and added to history'
+          : 'Transaction created but history entry failed',
+        transaction: savedTransaction,
+        historyCreated
       });
     } catch (error) {
       console.error("Transaction creation error:", error);

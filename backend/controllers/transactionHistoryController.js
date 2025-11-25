@@ -1,190 +1,314 @@
-const TransactionHistory = require("../models/TransactionHistory");
+const Transaction = require('../models/Transaction');
+const { 
+  createHistoryFromTransaction, 
+  updateHistoryFromTransaction, 
+  deleteHistoryFromTransaction 
+} = require('./transactionHistoryController');
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
 
-// Helper function to create history from transaction data
-const createHistoryFromTransaction = async (transactionData) => {
-  try {
-    console.log("Creating transaction history with data:", transactionData);
-    
-    const historyEntry = new TransactionHistory({
-      userId: transactionData.userId,
-      date: transactionData.date,
-      title: transactionData.description,
-      amount: transactionData.amount,
-      type: transactionData.type,
-      category: transactionData.category,
-      icon: transactionData.icon || 'default',
-      note: transactionData.note || transactionData.description
-    });
-    
-    const saved = await historyEntry.save();
-    console.log("Transaction history created successfully:", saved._id);
-    return saved;
-  } catch (error) {
-    console.error("Error creating transaction history:", error);
-    throw error;
-  }
-};
-
-// Helper function to update history from transaction data
-const updateHistoryFromTransaction = async (transactionData) => {
-  try {
-    console.log("Updating transaction history with data:", transactionData);
-    
-    const updated = await TransactionHistory.findOneAndUpdate(
-      { 
-        userId: transactionData.userId,
-        title: transactionData.oldDescription || transactionData.description,
-        amount: transactionData.oldAmount || transactionData.amount
-      },
-      {
-        date: transactionData.date,
-        title: transactionData.description,
-        amount: transactionData.amount,
-        type: transactionData.type,
-        category: transactionData.category,
-        icon: transactionData.icon || 'default',
-        note: transactionData.note || transactionData.description
-      },
-      { new: true }
-    );
-    
-    if (updated) {
-      console.log("Transaction history updated successfully:", updated._id);
-    } else {
-      console.log("No matching transaction history found to update");
+// Multer configuration for invoice uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, '..', 'uploads', 'invoices');
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
     }
-    
-    return updated;
-  } catch (error) {
-    console.error("Error updating transaction history:", error);
-    throw error;
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'invoice-' + uniqueSuffix + path.extname(file.originalname));
   }
-};
+});
 
-// Helper function to delete history from transaction data
-const deleteHistoryFromTransaction = async (userId, transactionData) => {
-  try {
-    console.log("Deleting transaction history for:", transactionData.description);
-    
-    const deleted = await TransactionHistory.findOneAndDelete({
-      userId: userId,
-      title: transactionData.description,
-      amount: transactionData.amount,
-      type: transactionData.type
-    });
-    
-    if (deleted) {
-      console.log("Transaction history deleted successfully:", deleted._id);
-    } else {
-      console.log("No matching transaction history found to delete");
-    }
-    
-    return deleted;
-  } catch (error) {
-    console.error("Error deleting transaction history:", error);
-    throw error;
-  }
-};
-
-// Create
-exports.addTransactionHistory = async (req, res) => {
-  if (!req.user || !req.user.userId) {
-    return res.status(401).json({ error: "Unauthorized: User not authenticated" });
-}
-  try {
-    const { date, title, amount, type, category, icon, note } = req.body;
-    const newHistory = new TransactionHistory({
-      userId: req.user.userId,
-      date,
-      title,
-      amount,
-      type,
-      category,
-      icon,
-      note
-    });
-    await newHistory.save();
-    res.status(201).json(newHistory);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// Read (all/filter)
-exports.getTransactionHistories = async (req, res) => {
-  if (!req.user || !req.user.userId) {
-    return res.status(401).json({ error: "Unauthorized: User not authenticated" });
-  }
-  try {
-    const { startDate, endDate, category, type } = req.query;
-    let filter = { userId: req.user.userId };
-
-    if (startDate && endDate) {
-      filter.date = { $gte: new Date(startDate), $lte: new Date(endDate) };
-    }
-    if (category) filter.category = category;
-    if (type) filter.type = type;
-
-    const histories = await TransactionHistory.find(filter).sort({ date: -1 });
-    res.json(histories);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// Update
-exports.updateTransactionHistory = async (req, res) => {
-  // Improve authentication error logging
-  if (!req.user) {
-    console.error("Authentication error: req.user is undefined or null");
-    return res.status(401).json({ error: "Unauthorized: User not authenticated" });
-  }
+const fileFilter = (req, file, cb) => {
+  // Accept images and PDFs only
+  const allowedTypes = /jpeg|jpg|png|pdf/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = allowedTypes.test(file.mimetype);
   
-  if (!req.user.userId) {
-    console.error("Authentication error: req.user exists but userId is missing");
-    return res.status(401).json({ error: "Unauthorized: User ID not found" });
+  if (mimetype && extname) {
+    return cb(null, true);
+  } else {
+    cb(new Error('Only images (jpeg, jpg, png) and PDF files are allowed!'));
   }
-  
-  try {
-    const id = req.params.id;
-    const updateFields = req.body;
-    
-    console.log(`Attempting to update transaction ${id} for user ${req.user.userId}`);
-    
-    const updated = await TransactionHistory.findOneAndUpdate(
-      { _id: id, userId: req.user.userId },
-      updateFields,
-      { new: true }
-    );
-    
-    if (!updated) {
-      console.log(`Transaction ${id} not found or doesn't belong to user ${req.user.userId}`);
-      return res.status(404).json({ error: "Transaction not found or unauthorized access" });
+};
+
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
+
+const transactionController = {
+  // Export upload middleware
+  uploadInvoice: upload.single('invoice'),
+
+  async getAllTransactions(req, res) {
+    try {
+      const { page = 1, limit = 10, type, category } = req.query;
+      const filter = { userId: req.user._id };
+      
+      if (type) filter.type = type;
+      if (category) filter.category = category;
+      
+      const transactions = await Transaction.find(filter)
+        .sort({ date: -1 })
+        .limit(limit * 1)
+        .skip((page - 1) * limit);
+        
+      const total = await Transaction.countDocuments(filter);
+      
+      res.json({
+        transactions,
+        totalPages: Math.ceil(total / limit),
+        currentPage: page,
+        total
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Server error', details: error.message });
     }
-    
-    res.json(updated);
-  } catch (err) {
-    console.error("Transaction update error:", err);
-    res.status(500).json({ error: err.message });
+  },
+
+  async createTransaction(req, res) {
+    try {
+      const { type, category, amount, description, date, paymentMethod, icon, note } = req.body;
+      
+      console.log("Creating transaction with data:", req.body);
+      
+      if (!type || !category || !amount || !description || !date) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+      
+      const transaction = new Transaction({
+        userId: req.user._id,
+        type,
+        category,
+        amount: parseFloat(amount),
+        description,
+        date: new Date(date),
+        paymentMethod: paymentMethod || 'cash',
+        invoice: req.file ? `/uploads/invoices/${req.file.filename}` : null
+      });
+      
+      const savedTransaction = await transaction.save();
+      console.log("Transaction saved successfully:", savedTransaction._id);
+      
+      // Automatically create entry in TransactionHistory
+      try {
+        const historyData = {
+          userId: req.user._id,
+          date: savedTransaction.date,
+          description: savedTransaction.description,
+          amount: savedTransaction.amount,
+          type: savedTransaction.type,
+          category: savedTransaction.category,
+          icon: icon || 'default',
+          note: note || description
+        };
+        
+        console.log("Creating history entry with data:", historyData);
+        const historyEntry = await createHistoryFromTransaction(historyData);
+        console.log("History entry created successfully:", historyEntry._id);
+      } catch (historyError) {
+        console.error('Error creating transaction history:', historyError.message);
+        // Continue even if history creation fails
+      }
+      
+      res.status(201).json({
+        success: true,
+        message: 'Transaction created successfully and added to history',
+        transaction: savedTransaction
+      });
+    } catch (error) {
+      console.error("Transaction creation error:", error);
+      if (req.file) {
+        fs.unlinkSync(req.file.path);
+      }
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
+  async getTransactionById(req, res) {
+    try {
+      const transaction = await Transaction.findOne({
+        _id: req.params.id,
+        userId: req.user._id
+      });
+      
+      if (!transaction) {
+        return res.status(404).json({ error: 'Transaction not found' });
+      }
+      
+      res.json(transaction);
+    } catch (error) {
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
+  async updateTransaction(req, res) {
+    try {
+      const updateData = { ...req.body };
+      
+      console.log("Updating transaction:", req.params.id);
+      
+      // Get old transaction data first
+      const oldTransaction = await Transaction.findOne({
+        _id: req.params.id,
+        userId: req.user._id
+      });
+      
+      if (!oldTransaction) {
+        if (req.file) {
+          fs.unlinkSync(req.file.path);
+        }
+        return res.status(404).json({ error: 'Transaction not found' });
+      }
+      
+      if (req.file) {
+        updateData.invoice = `/uploads/invoices/${req.file.filename}`;
+        
+        if (oldTransaction.invoice) {
+          const oldFilePath = path.join(__dirname, '..', oldTransaction.invoice);
+          if (fs.existsSync(oldFilePath)) {
+            fs.unlinkSync(oldFilePath);
+          }
+        }
+      }
+      
+      const transaction = await Transaction.findOneAndUpdate(
+        { _id: req.params.id, userId: req.user._id },
+        updateData,
+        { new: true }
+      );
+      
+      console.log("Transaction updated successfully");
+      
+      // Update TransactionHistory
+      try {
+        const historyUpdateData = {
+          userId: req.user._id,
+          oldDescription: oldTransaction.description,
+          oldAmount: oldTransaction.amount,
+          date: transaction.date,
+          description: transaction.description,
+          amount: transaction.amount,
+          type: transaction.type,
+          category: transaction.category,
+          icon: updateData.icon || 'default',
+          note: updateData.note || transaction.description
+        };
+        
+        await updateHistoryFromTransaction(historyUpdateData);
+        console.log('Transaction history updated successfully');
+      } catch (historyError) {
+        console.error('Error updating transaction history:', historyError.message);
+      }
+      
+      res.json({
+        success: true,
+        message: 'Transaction updated successfully',
+        transaction: transaction
+      });
+    } catch (error) {
+      console.error("Transaction update error:", error);
+      if (req.file) {
+        fs.unlinkSync(req.file.path);
+      }
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
+  async deleteTransaction(req, res) {
+    try {
+      console.log("Deleting transaction:", req.params.id);
+      
+      const transaction = await Transaction.findOneAndDelete({
+        _id: req.params.id,
+        userId: req.user._id
+      });
+      
+      if (!transaction) {
+        return res.status(404).json({ error: 'Transaction not found' });
+      }
+      
+      if (transaction.invoice) {
+        const filePath = path.join(__dirname, '..', transaction.invoice);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+      
+      // Delete from TransactionHistory
+      try {
+        await deleteHistoryFromTransaction(
+          req.user._id,
+          {
+            description: transaction.description,
+            amount: transaction.amount,
+            type: transaction.type
+          }
+        );
+        console.log('Transaction history deleted successfully');
+      } catch (historyError) {
+        console.error('Error deleting transaction history:', historyError.message);
+      }
+      
+      res.json({ 
+        success: true,
+        message: 'Transaction and history deleted successfully' 
+      });
+    } catch (error) {
+      console.error("Transaction deletion error:", error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
+  async getTransactionHistory(req, res) {
+    try {
+      const { startDate, endDate, type } = req.query;
+      const filter = { userId: req.user._id };
+      
+      if (startDate && endDate) {
+        filter.date = {
+          $gte: new Date(startDate),
+          $lte: new Date(endDate)
+        };
+      }
+      
+      if (type) filter.type = type;
+      
+      const transactions = await Transaction.find(filter).sort({ date: -1 });
+      
+      const summary = {
+        totalIncome: 0,
+        totalExpense: 0,
+        netAmount: 0,
+        transactionCount: transactions.length
+      };
+      
+      transactions.forEach(transaction => {
+        if (transaction.type === 'income') {
+          summary.totalIncome += transaction.amount;
+        } else {
+          summary.totalExpense += transaction.amount;
+        }
+      });
+      
+      summary.netAmount = summary.totalIncome - summary.totalExpense;
+      
+      res.json({
+        success: true,
+        transactions,
+        summary
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
   }
 };
 
-// Delete
-exports.deleteTransactionHistory = async (req, res) => {
-  if (!req.user || !req.user.userId) {
-    return res.status(401).json({ error: "Unauthorized: User not authenticated" });
-  }
-  try {
-    const id = req.params.id;
-    const deleted = await TransactionHistory.findOneAndDelete({ _id: id, userId: req.user.userId });
-    if (!deleted) return res.status(404).json({ error: "Not found" });
-    res.json({ success: true, message: "Deleted", history: deleted });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// Export helper functions
-module.exports.createHistoryFromTransaction = createHistoryFromTransaction;
-module.exports.updateHistoryFromTransaction = updateHistoryFromTransaction;
-module.exports.deleteHistoryFromTransaction = deleteHistoryFromTransaction;
+module.exports = transactionController;
