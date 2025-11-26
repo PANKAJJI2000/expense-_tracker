@@ -231,12 +231,11 @@ const TransactionHistory = () => {
             <TableHead>
               <TableRow>
                 <TableCell>ID</TableCell>
-                <TableCell>Title</TableCell>
+                <TableCell>Item/Description</TableCell>
                 <TableCell>Type</TableCell>
                 <TableCell>Category</TableCell>
                 <TableCell>Amount</TableCell>
                 <TableCell>User</TableCell>
-                <TableCell>Note</TableCell>
                 <TableCell>Date</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
@@ -244,13 +243,13 @@ const TransactionHistory = () => {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center">
+                  <TableCell colSpan={8} align="center">
                     <CircularProgress />
                   </TableCell>
                 </TableRow>
               ) : paginatedHistory.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center">
+                  <TableCell colSpan={8} align="center">
                     <Typography color="textSecondary">No transaction history found</Typography>
                   </TableCell>
                 </TableRow>
@@ -260,72 +259,73 @@ const TransactionHistory = () => {
                     <TableCell sx={{ fontSize: '0.75rem', maxWidth: 120 }}>
                       {item._id?.substring(0, 8) || 'N/A'}...
                     </TableCell>
-                    <TableCell>{item.title || item.description || 'N/A'}</TableCell>
+                    <TableCell>{item.item || item.title || item.description || 'N/A'}</TableCell>
                     <TableCell>
-                      <Chip
-                        label={item.type || 'N/A'}
-                        color={item.type === 'income' ? 'success' : item.type === 'expense' ? 'error' : 'default'}
-                        size="small"
-                      />
+                      {item.type ? (
+                        <Chip
+                          label={item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                          color={item.type === 'income' ? 'success' : 'error'}
+                          size="small"
+                        />
+                      ) : (
+                        <Chip label="N/A" color="default" size="small" />
+                      )}
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={item.category || 'N/A'}
+                        label={item.category || 'uncategorized'}
                         variant="outlined"
                         size="small"
                       />
                     </TableCell>
                     <TableCell>
                       <Typography
-                        color={item.type === 'income' ? 'success.main' : 'error.main'}
+                        color={item.type === 'income' ? 'success.main' : item.type === 'expense' ? 'error.main' : 'text.primary'}
                         fontWeight="bold"
                       >
-                        {item.type === 'income' ? '+' : '-'}$
+                        {item.type === 'income' ? '+' : item.type === 'expense' ? '-' : ''}₹
                         {typeof item.amount === 'number' ? item.amount.toFixed(2) : '0.00'}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      {item.userId?.name || item.userId?.email || item.userId || 'N/A'}
+                      {item.userId?.name || item.userId?.email || (typeof item.userId === 'string' ? item.userId.substring(0, 8) + '...' : 'N/A')}
                     </TableCell>
-                                        <TableCell sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                          {item.note || item.description || '-'}
-                                        </TableCell>
-                                        <TableCell>
-                                          {new Date(item.date).toLocaleDateString()}
-                                        </TableCell>
-                                        <TableCell>
-                                          <IconButton size="small" onClick={() => handleDelete(item._id)}>
-                                            <Delete fontSize="small" />
-                                          </IconButton>
-                                        </TableCell>
-                                      </TableRow>
-                                    ))
-                                  )}
-                                </TableBody>
-                              </Table>
-                            </TableContainer>
-                            {totalPages > 1 && (
-                              <Pagination
-                                count={totalPages}
-                                page={page}
-                                onChange={(e, value) => setPage(value)}
-                                sx={{ p: 2, display: 'flex', justifyContent: 'center' }}
-                              />
-                            )}
-                          </Paper>
+                    <TableCell>
+                      {item.date ? new Date(item.date).toLocaleDateString() : 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      <IconButton size="small" onClick={() => handleDelete(item._id)}>
+                        <Delete fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        {totalPages > 1 && (
+          <Pagination
+            count={totalPages}
+            page={page}
+            onChange={(e, value) => setPage(value)}
+            sx={{ p: 2, display: 'flex', justifyContent: 'center' }}
+          />
+        )}
+      </Paper>
                     
-                          <Snackbar
-                            open={snackbar.open}
-                            autoHideDuration={6000}
-                            onClose={handleCloseSnackbar}
-                            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-                          >
-                            <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-                              {snackbar.message}
-                            </Alert>
-                          </Snackbar>
-                        </Box>
-                      )
-                    }
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box>
+  )
+}
                     
-                    export default TransactionHistory
+export default TransactionHistory

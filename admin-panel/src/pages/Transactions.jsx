@@ -58,6 +58,7 @@ const Transactions = () => {
       if (dateRange.end) params.append('endDate', dateRange.end)
       
       const response = await api.get(`/admin/transactions?${params}`)
+      console.log('Transactions response:', response.data)
       setTransactions(response.data.transactions || response.data || [])
       
       setSnackbar({
@@ -197,7 +198,7 @@ const Transactions = () => {
             <TableHead>
               <TableRow>
                 <TableCell>ID</TableCell>
-                <TableCell>Description</TableCell>
+                <TableCell>Item/Description</TableCell>
                 <TableCell>Type</TableCell>
                 <TableCell>Category</TableCell>
                 <TableCell>Amount</TableCell>
@@ -224,30 +225,49 @@ const Transactions = () => {
                 paginatedTransactions.map((transaction) => (
                   <TableRow key={transaction._id}>
                     <TableCell sx={{ fontSize: '0.75rem', maxWidth: 120 }}>
-                      {transaction._id}
+                      {transaction._id?.substring(0, 8) || 'N/A'}...
                     </TableCell>
-                    <TableCell>{transaction.description || 'N/A'}</TableCell>
+                    <TableCell>{transaction.item || transaction.description || 'N/A'}</TableCell>
                     <TableCell>
-                      <Chip
-                        label={transaction.type || 'N/A'}
-                        color={transaction.type === 'income' ? 'success' : 'error'}
+                      {transaction.type ? (
+                        <Chip
+                          label={transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
+                          color={transaction.type === 'income' ? 'success' : 'error'}
+                          size="small"
+                        />
+                      ) : (
+                        <Chip label="N/A" color="default" size="small" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={transaction.category || 'uncategorized'} 
+                        variant="outlined"
                         size="small"
                       />
                     </TableCell>
-                    <TableCell>{transaction.category || 'N/A'}</TableCell>
                     <TableCell>
                       <Typography
-                        color={transaction.type === 'income' ? 'success.main' : 'error.main'}
+                        color={transaction.type === 'income' ? 'success.main' : transaction.type === 'expense' ? 'error.main' : 'text.primary'}
                         fontWeight="bold"
                       >
-                        {transaction.type === 'income' ? '+' : '-'}${transaction.amount?.toFixed(2) || '0.00'}
+                        {transaction.type === 'income' ? '+' : transaction.type === 'expense' ? '-' : ''}₹
+                        {typeof transaction.amount === 'number' ? transaction.amount.toFixed(2) : '0.00'}
                       </Typography>
                     </TableCell>
-                    <TableCell>{transaction.userId?.name || transaction.userId?.email || 'N/A'}</TableCell>
+                    <TableCell>
+                      {transaction.userId?.name || transaction.userId?.email || (typeof transaction.userId === 'string' ? transaction.userId.substring(0, 8) + '...' : 'N/A')}
+                    </TableCell>
                     <TableCell>
                       {transaction.date ? new Date(transaction.date).toLocaleDateString() : 'N/A'}
                     </TableCell>
-                    <TableCell>{transaction.paymentMethod || 'cash'}</TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={transaction.paymentMethod || 'cash'} 
+                        size="small"
+                        variant="outlined"
+                      />
+                    </TableCell>
                     <TableCell>
                       <Box>
                         <IconButton size="small" title="View Details">

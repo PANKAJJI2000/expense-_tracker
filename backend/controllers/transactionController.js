@@ -123,8 +123,9 @@ const transactionController = {
           userId: req.user._id,
           date: savedTransaction.date,
           description: savedTransaction.description || savedTransaction.item,
+          item: savedTransaction.item,
           amount: savedTransaction.amount,
-          type: savedTransaction.type,
+          type: savedTransaction.type, // Ensure this is present
           category: savedTransaction.category,
           icon: icon || '💰',
           note: note || savedTransaction.description || savedTransaction.item,
@@ -132,7 +133,7 @@ const transactionController = {
           status: 'completed'
         };
         
-        console.log("Creating history entry with data:", JSON.stringify(historyData, null, 2));
+        console.log("Creating history entry with type:", historyData.type);
         const historyEntry = await createHistoryFromTransaction(historyData);
         
         if (historyEntry) {
@@ -335,6 +336,86 @@ const transactionController = {
         summary
       });
     } catch (error) {
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  },
+
+  async getFinancialSummary(req, res) {
+    try {
+      const { startDate, endDate } = req.query;
+      const filter = { userId: req.user._id };
+      
+      console.log('User ID:', req.user._id);
+      console.log('Filter:', filter);
+      
+      // Add date filter if provided
+      if (startDate && endDate) {
+        filter.date = {
+          $gte: new Date(startDate),
+          $lte: new Date(endDate)
+        };
+        console.log('Date filter applied:', filter.date);
+      }
+      
+      const transactions = await Transaction.find(filter);
+      
+      console.log('Found transactions:', transactions.length);
+      
+      const summary = {
+        totalIncome: 0,
+        totalExpense: 0,
+        balance: 0,
+        transactionCount: transactions.length,
+        incomeCount: 0,
+        expenseCount: 0
+      };
+      
+      transactions.forEach(transaction => {
+        const type = transaction.type?.toString().toLowerCase().trim();
+        const amount = parseFloat(transaction.amount) || 0;
+        
+        console.log(`Processing transaction:`, {
+          id: transaction._id,
+          type: transaction.type,
+          typeProcessed: type,
+          amount: amount,
+          rawType: JSON.stringify(transaction.type)
+        });
+        
+        if (type === 'income') {
+          summary.totalIncome += amount;
+          summary.incomeCount++;
+          console.log(`✓ Income added: ${amount}, Total Income: ${summary.totalIncome}`);
+        } else if (type === 'expense') {
+          summary.totalExpense += amount;
+          summary.expenseCount++;
+          console.log(`✓ Expense added: ${amount}, Total Expense: ${summary.totalExpense}`);
+        } else {
+          console.log(`✗ Unknown type: "${type}"`);
+        }
+      });
+      
+      summary.balance = summary.totalIncome - summary.totalExpense;
+      
+      console.log('Final summary:', summary);
+      
+      res.json({
+        success: true,
+        summary: {
+          balance: parseFloat(summary.balance.toFixed(2)),
+          totalIncome: parseFloat(summary.totalIncome.toFixed(2)),
+          totalExpense: parseFloat(summary.totalExpense.toFixed(2)),
+          transactionCount: summary.transactionCount,
+          incomeCount: summary.incomeCount,
+          expenseCount: summary.expenseCount
+        },
+        period: startDate && endDate ? {
+          from: new Date(startDate).toISOString(),
+          to: new Date(endDate).toISOString()
+        } : 'All time'
+      });
+    } catch (error) {
+      console.error('Summary error:', error);
       res.status(500).json({ error: 'Server error', details: error.message });
     }
   }

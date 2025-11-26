@@ -4,6 +4,7 @@ const transactionController = require('../controllers/transactionController');
 const auth = require('../middleware/auth');
 
 // Specific routes MUST come BEFORE dynamic routes like /:id
+router.get('/summary', auth, transactionController.getFinancialSummary);
 router.get('/transaction-history', auth, transactionController.getTransactionHistory);
 
 // General transaction routes

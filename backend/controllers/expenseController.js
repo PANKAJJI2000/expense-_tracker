@@ -12,7 +12,7 @@ const expenseController = {
 
   async createExpense(req, res) {
     try {
-      const { title, amount, date, category } = req.body;
+      const { title, amount, date, category, fullName, email, phone } = req.body;
       
       if (!title || !amount || !date) {
         return res.status(400).json({ error: 'Missing required fields' });
@@ -23,11 +23,18 @@ const expenseController = {
         amount: parseInt(amount),
         date,
         category: category || 'General',
+        fullName: fullName || req.user?.name,
+        email: email || req.user?.email,
+        phone: phone || '',
         userId: req.user._id
       });
       
       await newExpense.save();
-      res.status(201).json(newExpense);
+      res.status(201).json({
+        success: true,
+        message: 'Expense created successfully',
+        data: newExpense
+      });
     } catch (error) {
       res.status(500).json({ error: 'Server error', details: error.message });
     }

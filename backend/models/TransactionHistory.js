@@ -33,7 +33,6 @@ const TransactionHistorySchema = new mongoose.Schema({
   type: { 
     type: String, 
     enum: ["income", "expense"], 
-    required: true 
   },
   
   // Category (Shopping, Entertainment, Transfer, Education, etc.)

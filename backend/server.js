@@ -15,8 +15,8 @@ const autoExpenseRoutes = require('./routes/autoExpenseRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const userRoutes = require('./routes/userRoutes');
-const manageExpenseRoutes = require('./routes/manageExpenseRoutes');
 const incomeTaxHelpRoutes = require('./routes/incomeTaxHelpRoutes');
+const manageExpenseRoutes = require('./routes/manageExpenseRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -92,8 +92,8 @@ app.use('/api/admin', adminRoutes); // Admin panel specific routes
 app.use('/api/categories', categoryRoutes);
 app.use('/api/profiles', profileRoutes); // Profile routes
 app.use('/api/users', userRoutes); // User routes
-app.use('/api/manage-expenses', manageExpenseRoutes); // Manage Expense form routes
 app.use('/api/income-tax-help', incomeTaxHelpRoutes); // Income Tax Help form routes
+app.use('/api/manage-expense', manageExpenseRoutes); // Manage Expense form routes
 
 // Health check endpoint - Enhanced with session info
 app.get('/api/health', (req, res) => {
