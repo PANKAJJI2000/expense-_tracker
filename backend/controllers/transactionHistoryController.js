@@ -1,4 +1,5 @@
 const Transaction = require('../models/Transaction');
+const TransactionHistory = require('../models/TransactionHistory');
 const { 
   createHistoryFromTransaction, 
   updateHistoryFromTransaction, 
@@ -281,7 +282,7 @@ const transactionController = {
       
       if (type) filter.type = type;
       
-      const transactions = await Transaction.find(filter).sort({ date: -1 });
+      const transactions = await TransactionHistory.find(filter).sort({ date: -1 });
       
       const summary = {
         totalIncome: 0,
