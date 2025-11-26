@@ -7,10 +7,6 @@ const transactionSchema = new mongoose.Schema({
     ref: 'User', // Reference to your User model
     required: true,
   },
-  // name: {
-  //   type: String,
-  //   trim: true,
-  // },
   
   // The category of the transaction
   category: {
@@ -56,6 +52,13 @@ const transactionSchema = new mongoose.Schema({
     type: String,
     enum: ['pending', 'completed', 'cancelled'],
     default: 'completed',
+  },
+  
+  // The type of transaction - income or expense
+  type: {
+    type: String,
+    enum: ['income', 'expense'],
+    required: false
   }
 }, {
   // Adds createdAt and updatedAt timestamps automatically

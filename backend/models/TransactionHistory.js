@@ -11,7 +11,7 @@ const TransactionHistorySchema = new mongoose.Schema({
   // Transaction date (Sep 25, Sep 21, etc.)
   date: { 
     type: Date, 
-    required: true,
+    required: false,
     default: Date.now
   },
   

@@ -97,7 +97,7 @@ const transactionController = {
       
       const transactionData = {
         userId: req.user._id,
-        type,
+        type, // type is optional in schema, but should be set if provided
         category,
         amount: parseFloat(amount),
         date: new Date(date),
