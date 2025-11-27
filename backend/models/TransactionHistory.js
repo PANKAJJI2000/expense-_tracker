@@ -11,7 +11,6 @@ const TransactionHistorySchema = new mongoose.Schema({
   // Transaction date (Sep 25, Sep 21, etc.)
   date: { 
     type: Date, 
-    required: false,
     default: Date.now
   },
   
@@ -38,7 +37,6 @@ const TransactionHistorySchema = new mongoose.Schema({
   // Category (Shopping, Entertainment, Transfer, Education, etc.)
   category: { 
     type: String, 
-    required: true,
     trim: true
   },
   

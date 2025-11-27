@@ -10,9 +10,7 @@ const transactionSchema = new mongoose.Schema({
   
   // The category of the transaction
   category: {
-    type: String,
-    required: false, // Made optional as it's not in the screenshot
-  },
+    type: String,  },
   
   // Item name/title - "Enter the item" field from screenshot
   item: {
@@ -37,7 +35,6 @@ const transactionSchema = new mongoose.Schema({
   // The date of the transaction
   date: {
     type: Date,
-    required: true,
     default: Date.now,
   },
   
@@ -58,7 +55,6 @@ const transactionSchema = new mongoose.Schema({
   type: {
     type: String,
     enum: ['income', 'expense'],
-    required: false
   }
 }, {
   // Adds createdAt and updatedAt timestamps automatically

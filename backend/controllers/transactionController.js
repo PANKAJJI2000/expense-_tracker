@@ -81,8 +81,8 @@ const transactionController = {
       
       // Check for required fields
       const missingFields = [];
-      if (!type) missingFields.push('type');
-      if (!category) missingFields.push('category');
+      // if (!type) missingFields.push('type');
+      // if (!category) missingFields.push('category');
       if (!amount) missingFields.push('amount');
       if (!description && !item) missingFields.push('description or item');
       if (!date) missingFields.push('date');
