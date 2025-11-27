@@ -85,7 +85,7 @@ const transactionController = {
       // if (!category) missingFields.push('category');
       if (!amount) missingFields.push('amount');
       if (!description && !item) missingFields.push('description or item');
-      if (!date) missingFields.push('date');
+      // if (!date) missingFields.push('date');
       
       if (missingFields.length > 0) {
         return res.status(400).json({ 
