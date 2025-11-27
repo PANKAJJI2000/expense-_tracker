@@ -33,10 +33,10 @@ const transactionSchema = new mongoose.Schema({
   },
   
   // The date of the transaction
-  date: {
-    type: Date,
-    default: Date.now,
-  },
+  // date: {
+  //   type: Date,
+  //   default: Date.now,
+  // },
   
   // The method of payment used for the transaction
   paymentMethod: {
