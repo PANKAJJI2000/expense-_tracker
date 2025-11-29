@@ -43,6 +43,14 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 
+// Category to icon mapping
+const categoryIcons = {
+  Guava: '🍈',
+  Fruits: '🍎',
+  Food: '🍔',
+  // Add more categories as needed
+};
+
 const transactionController = {
   // Export upload middleware
   uploadInvoice: upload.single('invoice'),
@@ -97,7 +105,7 @@ const transactionController = {
       
       const transactionData = {
         userId: req.user._id,
-        type, // type is optional in schema, but should be set if provided
+        type,
         category,
         amount: parseFloat(amount),
         date: new Date(date),
@@ -105,7 +113,7 @@ const transactionController = {
         icon: icon || 'null',
         invoice: req.file ? `/uploads/invoices/${req.file.filename}` : null
       };
-      
+
       // Handle item and description fields
       if (item) transactionData.item = item;
       if (description) transactionData.description = description;
@@ -113,7 +121,6 @@ const transactionController = {
       if (!description && item) transactionData.description = item;
       
       const transaction = new Transaction(transactionData);
-      
       const savedTransaction = await transaction.save();
       console.log("Transaction saved successfully:", savedTransaction._id);
       
@@ -146,12 +153,18 @@ const transactionController = {
         console.error('History error details:', historyError.message);
       }
       
+      // Determine icon for response
+      const responseIcon = categoryIcons[savedTransaction.category] || '💳';
+
       res.status(201).json({
         success: true,
         message: historyCreated 
           ? 'Transaction created successfully and added to history'
           : 'Transaction created but history entry failed',
-        transaction: savedTransaction,
+        transaction: {
+          ...savedTransaction.toObject(),
+          icon: responseIcon
+        },
         historyCreated
       });
     } catch (error) {
