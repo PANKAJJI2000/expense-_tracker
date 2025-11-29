@@ -9,7 +9,7 @@ const createHistoryFromTransaction = async (data) => {
       amount: data.amount,
       type: data.type, // Make sure this is included
       category: data.category,
-      icon: data.icon || '💰',
+      icon: data.icon || 'null',
       note: data.note,
       paymentMethod: data.paymentMethod || 'cash',
       status: data.status || 'completed'
@@ -24,7 +24,62 @@ const createHistoryFromTransaction = async (data) => {
   }
 };
 
+const getTransactionHistory = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const history = await require('../models/TransactionHistory').find({ userId });
+
+    // Map to include only necessary fields (including category and icon)
+    const formattedHistory = history.map(entry => ({
+      _id: entry._id,
+      date: entry.date,
+      title: entry.title,
+      amount: entry.amount,
+      type: entry.type,
+      category: entry.category || 'Uncategorized',
+      icon: entry.icon || 'null',
+      note: entry.note,
+      paymentMethod: entry.paymentMethod,
+      status: entry.status
+    }));
+
+    res.json({
+      success: true,
+      history: formattedHistory
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error', details: error.message });
+  }
+};
+
+const deleteTransactionHistory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await TransactionHistory.findByIdAndDelete(id);
+
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Transaction history not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Transaction history deleted successfully',
+      data: deleted,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      details: error.message,
+    });
+  }
+};
+
 module.exports = {
   createHistoryFromTransaction,
+  getTransactionHistory,
   // ...other exports
 };
