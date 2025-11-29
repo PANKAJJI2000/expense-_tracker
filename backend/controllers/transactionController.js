@@ -154,7 +154,7 @@ const transactionController = {
       }
       
       // Determine icon for response
-      const responseIcon = categoryIcons[savedTransaction.category] || '💳';
+      const responseIcon = categoryIcons[savedTransaction.category] || 'null';
 
       res.status(201).json({
         success: true,
