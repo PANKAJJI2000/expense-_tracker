@@ -163,7 +163,8 @@ const transactionController = {
           : 'Transaction created but history entry failed',
         transaction: {
           ...savedTransaction.toObject(),
-          icon: responseIcon
+          icon: responseIcon,
+          category: savedTransaction.category || 'Uncategorized'
         },
         historyCreated
       });
