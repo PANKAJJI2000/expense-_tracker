@@ -81,5 +81,6 @@ const deleteTransactionHistory = async (req, res) => {
 module.exports = {
   createHistoryFromTransaction,
   getTransactionHistory,
+  deleteTransactionHistory,
   // ...other exports
 };
