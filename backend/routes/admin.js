@@ -17,6 +17,9 @@ const {
   updateCategory,
   deleteCategory
 } = require('../controllers/adminController');
+const {
+  deleteTransactionHistory
+} = require('../controllers/transactionHistoryController');
 
 // Public routes
 router.post('/login', adminLogin);
@@ -41,5 +44,8 @@ router.get('/categories', adminAuth, getCategories);
 router.post('/categories', adminAuth, createCategory);
 router.put('/categories/:id', adminAuth, updateCategory);
 router.delete('/categories/:id', adminAuth, deleteCategory);
+
+// Transaction history management
+router.delete('/transaction-history/:id', adminAuth, deleteTransactionHistory);
 
 module.exports = router;

@@ -40,7 +40,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+  limits: { fileSize: 5 * 1024 * 1024 }
 });
 
 // Category to icon mapping
@@ -135,7 +135,7 @@ const transactionController = {
           amount: savedTransaction.amount,
           type: savedTransaction.type, // Ensure this is present
           category: savedTransaction.category,
-          icon: icon || '💰',
+          icon: icon || 'null',
           note: note || savedTransaction.description || savedTransaction.item,
           paymentMethod: savedTransaction.paymentMethod,
           status: 'completed'
@@ -329,15 +329,34 @@ const transactionController = {
       if (type) filter.type = type;
       
       const transactions = await Transaction.find(filter).sort({ date: -1 });
-      
+
+      // Ensure category and icon are always present in the response
+      const formattedTransactions = transactions.map(tx => ({
+        _id: tx._id,
+        userId: tx.userId,
+        item: tx.item,
+        amount: tx.amount,
+        invoice: tx.invoice ?? null,
+        paymentMethod: tx.paymentMethod ?? null,
+        status: tx.status ?? null,
+        type: tx.type ?? null,
+        date: tx.date,
+        updatedAt: tx.updatedAt,
+        createdAt: tx.createdAt,
+        category: tx.category ?? null,
+        icon: tx.icon ?? null,
+        note: tx.note ?? null,
+        description: tx.description ?? null
+      }));
+
       const summary = {
         totalIncome: 0,
         totalExpense: 0,
         netAmount: 0,
-        transactionCount: transactions.length
+        transactionCount: formattedTransactions.length
       };
       
-      transactions.forEach(transaction => {
+      formattedTransactions.forEach(transaction => {
         if (transaction.type === 'income') {
           summary.totalIncome += transaction.amount;
         } else {
@@ -349,7 +368,7 @@ const transactionController = {
       
       res.json({
         success: true,
-        transactions,
+        transactions: formattedTransactions,
         summary
       });
     } catch (error) {

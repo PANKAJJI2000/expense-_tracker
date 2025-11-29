@@ -124,9 +124,16 @@ const TransactionHistory = () => {
         fetchHistory()
       } catch (error) {
         console.error('Failed to delete history item:', error)
+        let errorMsg = 'Failed to delete history item'
+        if (error.response) {
+          errorMsg = error.response.data?.error ||
+            `Error ${error.response.status}: ${error.response.statusText}`
+        } else if (error.message) {
+          errorMsg = error.message
+        }
         setSnackbar({
           open: true,
-          message: 'Failed to delete history item',
+          message: errorMsg,
           severity: 'error'
         })
       }

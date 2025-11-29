@@ -142,11 +142,13 @@ router.post('/', async (req, res) => {
       title,
       amount: parseFloat(amount),
       type,
+      icon,
       category,
       date: date || new Date()
     };
 
-    if (icon) transactionData.icon = icon;
+    if (icon) transactionData.icon = icon ?? null;
+    if (category) transactionData.category = category ?? null;
     if (note) transactionData.note = note;
     if (paymentMethod) transactionData.paymentMethod = paymentMethod;
     if (status) transactionData.status = status;

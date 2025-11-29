@@ -8,8 +8,8 @@ const createHistoryFromTransaction = async (data) => {
       title: data.description || data.item,
       amount: data.amount,
       type: data.type, // Make sure this is included
-      category: data.category,
-      icon: data.icon || 'null',
+      category: data.category ?? null,
+      icon: data.icon ?? null,
       note: data.note,
       paymentMethod: data.paymentMethod || 'cash',
       status: data.status || 'completed'
@@ -26,18 +26,21 @@ const createHistoryFromTransaction = async (data) => {
 
 const getTransactionHistory = async (req, res) => {
   try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ success: false, error: 'User not authenticated or user ID missing.' });
+    }
     const userId = req.user._id;
-    const history = await require('../models/TransactionHistory').find({ userId });
+    const history = await TransactionHistory.find({ userId });
 
-    // Map to include only necessary fields (including category and icon)
+    // Map to include only necessary fields (category and icon as null if missing)
     const formattedHistory = history.map(entry => ({
       _id: entry._id,
       date: entry.date,
       title: entry.title,
       amount: entry.amount,
       type: entry.type,
-      category: entry.category || 'Uncategorized',
-      icon: entry.icon || 'null',
+      category: entry.category ?? null,
+      icon: entry.icon ?? null,
       note: entry.note,
       paymentMethod: entry.paymentMethod,
       status: entry.status
@@ -54,7 +57,15 @@ const getTransactionHistory = async (req, res) => {
 
 const deleteTransactionHistory = async (req, res) => {
   try {
-    const { id } = req.params;
+    // Use either req.params.id or req.params._id based on your route definition.
+    // Most likely, your route is /admin/transaction-history/:id
+    const id = req.params.id || req.params._id;
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Transaction history ID is required',
+      });
+    }
     const deleted = await TransactionHistory.findByIdAndDelete(id);
 
     if (!deleted) {
