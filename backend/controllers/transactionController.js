@@ -164,7 +164,7 @@ const transactionController = {
         transaction: {
           ...savedTransaction.toObject(),
           icon: responseIcon,
-          category: savedTransaction.category || 'Uncategorized'
+          category: savedTransaction.category || req.body.category || 'Uncategorized'
         },
         historyCreated
       });
