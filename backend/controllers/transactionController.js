@@ -167,7 +167,9 @@ const transactionController = {
           category: savedTransaction.category || req.body.category || 'Uncategorized'
         },
         historyCreated
+        
       });
+      // console.log('Saved transaction:', savedTransaction);
     } catch (error) {
       console.error("Transaction creation error:", error);
       if (req.file) {
