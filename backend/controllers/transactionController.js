@@ -102,6 +102,7 @@ const transactionController = {
         amount: parseFloat(amount),
         date: new Date(date),
         paymentMethod: paymentMethod || 'cash',
+        icon: icon || 'null',
         invoice: req.file ? `/uploads/invoices/${req.file.filename}` : null
       };
       
