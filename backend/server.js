@@ -270,11 +270,10 @@ app.get('/', (req, res) => {
     }
   });
 });
-
-// Simple API status endpoint
-app.get('/api', (req, res) => {
-  res.send("Expense Tracker API is running");
-  // res.redirect('/');
+// Live check endpoint - Lightweight response
+app.get('/live', (req, res) => {
+  res.send('Server is live and working successfully 🚀');
+  redirect('/');
 });
 
 // Session info endpoint
