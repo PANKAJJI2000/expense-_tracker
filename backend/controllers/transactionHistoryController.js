@@ -80,6 +80,7 @@ const deleteTransactionHistory = async (req, res) => {
       message: 'Transaction history deleted successfully',
       data: deleted,
     });
+    
   } catch (error) {
     res.status(500).json({
       success: false,

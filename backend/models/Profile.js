@@ -31,9 +31,19 @@ const profileSchema = new mongoose.Schema({
       message: "Please enter a valid phone number"
     }
   },
-  profilePic: { 
+  profilePicture: { 
     type: String, 
     default: "" 
+  },
+  gender: {
+    type: String,
+    enum: ["male", "female", "other"],
+    default: "other"
+  },
+  currency: {
+    type: String,
+    default: "INR",
+    trim: true
   },
   referralCode: { 
     type: String, 

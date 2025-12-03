@@ -8,7 +8,8 @@ const {
   updateProfileByUserId,
   updateProfile,
   deleteProfile,
-  getProfileByReferralCode
+  getProfileByReferralCode,
+  uploadProfilePic
 } = require('../controllers/profileController');
 
 // Public routes
@@ -20,8 +21,18 @@ router.get('/', getAllProfiles);
 router.get('/:id', getProfileById);
 router.get('/user/:userId', getProfileByUserId);
 router.put('/user/:userId', updateProfileByUserId);
+router.put(
+  '/profiles/user/:userId',
+  uploadProfilePic.single('profilePicture'),
+  updateProfileByUserId
+);
 
 router.put('/:id', updateProfile);
+router.put(
+  '/profiles/:id',
+  uploadProfilePic.single('profilePicture'),
+  updateProfile
+);
 router.delete('/:id', deleteProfile);
 
 module.exports = router;

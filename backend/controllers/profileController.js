@@ -1,13 +1,46 @@
 const Profile = require("../models/Profile");
 const User = require("../models/User");
 const mongoose = require("mongoose");
+const multer = require("multer");
+const path = require("path");
+
+// Multer config for profile images
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    // adjust folder as needed
+    cb(null, path.join(__dirname, "..", "uploads", "profiles"));
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const filename = `profile-${Date.now()}-${Math.round(
+      Math.random() * 1e9
+    )}${ext}`;
+    cb(null, filename);
+  },
+});
+
+const fileFilter = (req, file, cb) => {
+  if (/^image\//.test(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only image files are allowed"), false);
+  }
+};
+
+const upload = multer({ storage, fileFilter });
+
+// Use this in your routes: upload.single("profilePicture")
+exports.uploadProfilePic = upload;
 
 // @desc    Create new profile
 // @route   POST /api/profiles
 // @access  Private
 exports.createProfile = async (req, res) => {
   try {
-    const { userId, name, email, phone, profilePic, referredBy } = req.body;
+    const { userId, name, email, phone, gender, currency, referredBy } = req.body;
+    const profilePicture = req.file
+      ? req.file.path.replace(/\\/g, "/")
+      : req.body.profilePicture;
 
     // Check if profile already exists for this user
     const existingProfile = await Profile.findOne({ userId });
@@ -33,7 +66,9 @@ exports.createProfile = async (req, res) => {
       name,
       email,
       phone,
-      profilePic,
+      profilePicture,
+      gender,
+      currency,
       referredBy,
     });
 
@@ -152,10 +187,15 @@ exports.getProfileByUserId = async (req, res) => {
 // @access  Private
 exports.updateProfileByUserId = async (req, res) => {
   try {
-    const { name, email, phone, profilePic } = req.body;
+    const { name, email, phone, gender, currency } = req.body;
+    const profilePicture = req.file
+      ? req.file.path.replace(/\\/g, "/")
+      : req.body.profilePicture;
 
     console.log("Update User Request Body:", req.body);
     console.log("User ID:", req.params.userId);
+    console.log("Uploaded file (userId):", req.file);
+    console.log("Computed profilePicture (userId):", profilePicture);
     
     // Validate MongoDB ObjectId format
     if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
@@ -164,10 +204,10 @@ exports.updateProfileByUserId = async (req, res) => {
         message: "Invalid user ID format",
       });
     }
-    
+
     // Check if user exists
     const existingUser = await User.findById(req.params.userId);
-    
+
     if (!existingUser) {
       console.log("User not found with ID:", req.params.userId);
       return res.status(404).json({
@@ -192,13 +232,20 @@ exports.updateProfileByUserId = async (req, res) => {
       }
     }
 
-    // Update User model only
+    // Update User model
     const updatedUser = await User.findByIdAndUpdate(
       req.params.userId,
-      { name, email },
+      {
+        ...(name && { name }),
+        ...(email && { email }),
+        ...(phone && { phone }),
+        ...(gender && { gender }),
+        ...(currency && { currency }),
+        ...(profilePicture && { profilePicture }),
+      },
       {
         new: true,
-        runValidators: true
+        runValidators: true,
       }
     );
 
@@ -209,12 +256,34 @@ exports.updateProfileByUserId = async (req, res) => {
       });
     }
 
+    // Upsert Profile
+    const updatedProfile = await Profile.findOneAndUpdate(
+      { userId: req.params.userId },
+      {
+        ...(name && { name }),
+        ...(email && { email }),
+        ...(phone && { phone }),
+        ...(gender && { gender }),
+        ...(currency && { currency }),
+        ...(profilePicture && { profilePicture }),
+      },
+      {
+        new: true,
+        runValidators: true,
+        upsert: true,
+      }
+    );
+
     console.log("Updated User:", updatedUser);
+    console.log("Updated Profile:", updatedProfile);
 
     res.status(200).json({
       success: true,
-      message: "User updated successfully",
-      data: updatedUser,
+      message: "User and profile updated successfully",
+      data: {
+        user: updatedUser,
+        profile: updatedProfile,
+      },
     });
   } catch (error) {
     console.error("Update User Error:", error);
@@ -230,10 +299,15 @@ exports.updateProfileByUserId = async (req, res) => {
 // @access  Private
 exports.updateProfile = async (req, res) => {
   try {
-    const { name, email, phone, profilePic } = req.body;
+    const { name, email, phone, gender, currency } = req.body;
+    const profilePicture = req.file
+      ? req.file.path.replace(/\\/g, "/")
+      : req.body.profilePicture;
 
     console.log("Update User Request Body:", req.body);
     console.log("Profile ID:", req.params.id);
+    console.log("Uploaded file (profileId):", req.file);
+    console.log("Computed profilePicture (profileId):", profilePicture);
     
     // Validate MongoDB ObjectId format
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -242,10 +316,9 @@ exports.updateProfile = async (req, res) => {
         message: "Invalid profile ID format",
       });
     }
-    
+
     // Find the profile to get userId
     const existingProfile = await Profile.findById(req.params.id);
-    
     if (!existingProfile) {
       console.log("Profile not found with ID:", req.params.id);
       const allProfiles = await Profile.find({}).select('_id name email userId');
@@ -281,13 +354,20 @@ exports.updateProfile = async (req, res) => {
       }
     }
 
-    // Update User model only
+    // Update User model
     const updatedUser = await User.findByIdAndUpdate(
       existingProfile.userId,
-      { name, email },
+      {
+        ...(name && { name }),
+        ...(email && { email }),
+        ...(phone && { phone }),
+        ...(gender && { gender }),
+        ...(currency && { currency }),
+        ...(profilePicture && { profilePicture }),
+      },
       {
         new: true,
-        runValidators: true
+        runValidators: true,
       }
     );
 
@@ -298,12 +378,30 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
+    // Update Profile
+    const updatedProfile = await Profile.findByIdAndUpdate(
+      req.params.id,
+      {
+        ...(name && { name }),
+        ...(email && { email }),
+        ...(phone && { phone }),
+        ...(gender && { gender }),
+        ...(currency && { currency }),
+        ...(profilePicture && { profilePicture }),
+      },
+      { new: true, runValidators: true }
+    );
+
     console.log("Updated User:", updatedUser);
+    console.log("Updated Profile:", updatedProfile);
 
     res.status(200).json({
       success: true,
-      message: "User updated successfully",
-      data: updatedUser,
+      message: "User and profile updated successfully",
+      data: {
+        user: updatedUser,
+        profile: updatedProfile,
+      },
     });
   } catch (error) {
     console.error("Update User Error:", error);
@@ -366,6 +464,54 @@ exports.getProfileByReferralCode = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Get profile by user email
+// @route   POST /api/profiles/by-email
+// @access  Public or Private (depending on your route protection)
+exports.getProfileByEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email }).select("_id email username");
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found with this email",
+      });
+    }
+
+    // Find profile by userId
+    const profile = await Profile.findOne({ userId: user._id }).populate(
+      "userId",
+      "username email"
+    );
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: "Profile not found for this email",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: profile,
+    });
+  } catch (error) {
+    return res.status(500).json({
       success: false,
       message: error.message,
     });

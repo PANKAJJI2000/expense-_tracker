@@ -16,6 +16,9 @@ try {
   };
 }
 
+// Import upload middleware
+const upload = require('../middleware/upload');
+
 // Import admin controller
 let adminController;
 try {
@@ -90,6 +93,7 @@ const verifyFunction = (fn, name) => {
 // Import the new models at the top of the file
 const ManageExpense = require('../models/ManageExpense');
 const IncomeTaxHelp = require('../models/IncomeTaxHelp');
+const User = require('../models/User');
 
 // Public routes
 router.post('/login', verifyFunction(adminLogin, 'adminLogin'));
@@ -587,6 +591,107 @@ router.get('/users/unverified', adminController.getUnverifiedUsers);
 router.post('/users/:userId/verify-email', adminController.verifyUserEmail);
 router.post('/users/:userId/resend-verification', adminController.resendUserVerification);
 router.post('/users/bulk-verify', adminController.bulkVerifyUsers);
+
+// Admin profile image upload
+router.post('/profile/upload', adminAuth, upload.single('profile'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false,
+        error: "No file uploaded" 
+      });
+    }
+    
+    console.log('File uploaded:', req.file);
+    
+    // File path
+    const profileImage = `/uploads/${req.file.filename}`;
+    
+    // Update admin user profile (assuming admin ID is in req.user)
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { profileImage },
+      { new: true }
+    ).select('-password');
+    
+    res.json({ 
+      success: true,
+      message: "Profile image uploaded successfully",
+      profileImage: user.profileImage,
+      user
+    });
+  } catch (error) {
+    console.error('Profile upload error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
+    });
+  }
+});
+
+// Get admin profile
+router.get('/profile', adminAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'User not found' 
+      });
+    }
+    
+    res.json({ 
+      success: true,
+      data: user 
+    });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
+    });
+  }
+});
+
+// Update user profile image by admin
+router.put('/users/:id/profile-image', adminAuth, upload.single('profile'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false,
+        error: "No file uploaded" 
+      });
+    }
+    
+    const profileImage = `/uploads/${req.file.filename}`;
+    
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { profileImage },
+      { new: true }
+    ).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'User not found' 
+      });
+    }
+    
+    res.json({ 
+      success: true,
+      message: "User profile image updated successfully",
+      data: user
+    });
+  } catch (error) {
+    console.error('Update user profile error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
+    });
+  }
+});
 
 console.log('✓ Admin routes configured successfully');
 
