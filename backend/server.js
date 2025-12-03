@@ -267,13 +267,14 @@ app.get('/', (req, res) => {
       debugTransactionHistory: `${baseUrl}/api/admin/debug-transaction-history`,
       emailVerificationStats: `${baseUrl}/api/admin/email-verification/stats`,
       unverifiedUsers: `${baseUrl}/api/admin/users/unverified`
-    }
+    },
+    redirect: { live: `${baseUrl}/live` }
   });
 });
 // Live check endpoint - Lightweight response
-app.get('/live', (req, res) => {
+app.get('/status', (req, res) => {
   res.send('Server is live and working successfully 🚀');
-  redirect('/');
+  res.redirect('/');
 });
 
 // Session info endpoint
