@@ -13,6 +13,7 @@ import Profiles from './pages/Profiles'
 import Transactions from './pages/Transactions'
 import TransactionHistory from './pages/TransactionHistory'
 import Sessions from './pages/Sessions' // Add this import
+import Budget from './pages/Budget'
 
 function App() {
   return (
@@ -39,6 +40,7 @@ function App() {
             <Route path="transactions" element={<Transactions />} />
             <Route path="transaction-history" element={<TransactionHistory />} />
             <Route path="/sessions" element={<Sessions />} /> {/* Add this route */}
+            <Route path="/budgets" element={<Budget />} /> {/* Add this route */}
           </Route>
         </Routes>
       </Router>

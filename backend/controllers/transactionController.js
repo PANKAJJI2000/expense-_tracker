@@ -83,99 +83,85 @@ const transactionController = {
 
   async createTransaction(req, res) {
     try {
-      const { type, category, amount, description, date, paymentMethod, icon, note, item } = req.body;
-      
-      console.log("Creating transaction with data:", req.body);
-      
-      // Check for required fields
-      const missingFields = [];
-      // if (!type) missingFields.push('type');
-      // if (!category) missingFields.push('category');
-      if (!amount) missingFields.push('amount');
-      if (!description && !item) missingFields.push('description or item');
-      // if (!date) missingFields.push('date');
-      
-      if (missingFields.length > 0) {
-        return res.status(400).json({ 
-          error: 'Missing required fields',
-          missingFields: missingFields,
-          message: `Please provide: ${missingFields.join(', ')}`
+      const { 
+        type, 
+        category, 
+        categgory, // Handle typo from frontend
+        amount, 
+        item, 
+        description,
+        paymentMethod, 
+        note, 
+        icon,
+        date,
+        status 
+      } = req.body;
+
+      // Normalize category (handle typo)
+      const normalizedCategory = category || categgory || 'Other';
+
+      console.log('Creating transaction with data:', {
+        type,
+        category: normalizedCategory,
+        amount,
+        item,
+        paymentMethod,
+        note
+      });
+
+      // Validate required fields
+      if (!amount) {
+        return res.status(400).json({
+          success: false,
+          message: 'Amount is required'
         });
       }
-      
+
       const transactionData = {
         userId: req.user._id,
-        type,
-        category,
-        amount: parseFloat(amount),
-        date: new Date(date),
+        type: type || 'expense',
+        category: normalizedCategory,
+        amount: Math.abs(amount),
+        item: item || description || 'Untitled',
+        description: description || item || '',
         paymentMethod: paymentMethod || 'cash',
-        icon: icon || 'null',
-        invoice: req.file ? `/uploads/invoices/${req.file.filename}` : null
+        note: note || '',
+        icon: icon || 'receipt',
+        date: date || new Date(),
+        status: status || 'completed'
       };
 
-      // Handle item and description fields
-      if (item) transactionData.item = item;
-      if (description) transactionData.description = description;
-      if (!item && description) transactionData.item = description;
-      if (!description && item) transactionData.description = item;
-      
-      const transaction = new Transaction(transactionData);
-      const savedTransaction = await transaction.save();
-      console.log("Transaction saved successfully:", savedTransaction._id);
-      
-      // Automatically create entry in TransactionHistory
-      let historyCreated = false;
-      try {
-        const historyData = {
-          userId: req.user._id,
-          date: savedTransaction.date,
-          description: savedTransaction.description || savedTransaction.item,
-          item: savedTransaction.item,
-          amount: savedTransaction.amount,
-          type: savedTransaction.type, // Ensure this is present
-          category: savedTransaction.category,
-          icon: icon || 'null',
-          note: note || savedTransaction.description || savedTransaction.item,
-          paymentMethod: savedTransaction.paymentMethod,
-          status: 'completed'
-        };
-        
-        console.log("Creating history entry with type:", historyData.type);
-        const historyEntry = await createHistoryFromTransaction(historyData);
-        
-        if (historyEntry) {
-          console.log("History entry created successfully:", historyEntry._id);
-          historyCreated = true;
-        }
-      } catch (historyError) {
-        console.error('Error creating transaction history:', historyError);
-        console.error('History error details:', historyError.message);
-      }
-      
-      // Determine icon for response
-      const responseIcon = categoryIcons[savedTransaction.category] || 'null';
+      const transaction = await Transaction.create(transactionData);
+
+      // Also create history entry if needed
+      // await createHistoryFromTransaction(transactionData);
 
       res.status(201).json({
         success: true,
-        message: historyCreated 
-          ? 'Transaction created successfully and added to history'
-          : 'Transaction created but history entry failed',
-        transaction: {
-          ...savedTransaction.toObject(),
-          icon: responseIcon,
-          category: savedTransaction.category || req.body.category || 'Uncategorized'
-        },
-        historyCreated
-        
+        message: 'Transaction created successfully',
+        data: {
+          _id: transaction._id,
+          userId: transaction.userId,
+          type: transaction.type,
+          category: transaction.category,
+          amount: transaction.amount,
+          item: transaction.item,
+          description: transaction.description,
+          paymentMethod: transaction.paymentMethod,
+          note: transaction.note,
+          icon: transaction.icon,
+          date: transaction.date,
+          status: transaction.status,
+          createdAt: transaction.createdAt,
+          updatedAt: transaction.updatedAt
+        }
       });
-      // console.log('Saved transaction:', savedTransaction);
     } catch (error) {
-      console.error("Transaction creation error:", error);
-      if (req.file) {
-        fs.unlinkSync(req.file.path);
-      }
-      res.status(500).json({ error: 'Server error', details: error.message });
+      console.error('Create Transaction Error:', error);
+      res.status(400).json({
+        success: false,
+        message: error.message
+      });
     }
   },
 
@@ -316,63 +302,37 @@ const transactionController = {
 
   async getTransactionHistory(req, res) {
     try {
-      const { startDate, endDate, type } = req.query;
-      const filter = { userId: req.user._id };
-      
-      if (startDate && endDate) {
-        filter.date = {
-          $gte: new Date(startDate),
-          $lte: new Date(endDate)
-        };
-      }
-      
-      if (type) filter.type = type;
-      
-      const transactions = await Transaction.find(filter).sort({ date: -1 });
+      const userId = req.user._id;
+      const transactions = await Transaction.find({ userId }).sort({ createdAt: -1 });
 
-      // Ensure category and icon are always present in the response
-      const formattedTransactions = transactions.map(tx => ({
-        _id: tx._id,
-        userId: tx.userId,
-        item: tx.item,
-        amount: tx.amount,
-        invoice: tx.invoice ?? null,
-        paymentMethod: tx.paymentMethod ?? null,
-        status: tx.status ?? null,
-        type: tx.type ?? null,
-        date: tx.date,
-        updatedAt: tx.updatedAt,
-        createdAt: tx.createdAt,
-        category: tx.category ?? null,
-        icon: tx.icon ?? null,
-        note: tx.note ?? null,
-        description: tx.description ?? null
+      // Format response with defaults for null fields
+      const formattedTransactions = transactions.map(t => ({
+        _id: t._id,
+        userId: t.userId,
+        item: t.item || t.description || 'Untitled',
+        description: t.description || t.item || '',
+        amount: t.amount,
+        invoice: t.invoice || null,
+        paymentMethod: t.paymentMethod || 'cash',
+        status: t.status || 'completed',
+        type: t.type || 'expense',
+        category: t.category || 'Other',
+        icon: t.icon || 'receipt',
+        note: t.note || '',
+        date: t.date || t.createdAt,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt
       }));
 
-      const summary = {
-        totalIncome: 0,
-        totalExpense: 0,
-        netAmount: 0,
-        transactionCount: formattedTransactions.length
-      };
-      
-      formattedTransactions.forEach(transaction => {
-        if (transaction.type === 'income') {
-          summary.totalIncome += transaction.amount;
-        } else {
-          summary.totalExpense += transaction.amount;
-        }
-      });
-      
-      summary.netAmount = summary.totalIncome - summary.totalExpense;
-      
-      res.json({
+      res.status(200).json({
         success: true,
-        transactions: formattedTransactions,
-        summary
+        transactions: formattedTransactions
       });
     } catch (error) {
-      res.status(500).json({ error: 'Server error', details: error.message });
+      res.status(500).json({
+        success: false,
+        message: error.message
+      });
     }
   },
 

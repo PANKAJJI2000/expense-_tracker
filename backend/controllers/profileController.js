@@ -303,7 +303,7 @@ exports.updateProfile = async (req, res) => {
     const profilePicture = req.file
       ? req.file.path.replace(/\\/g, "/")
       : req.body.profilePicture;
-
+    
     console.log("Update User Request Body:", req.body);
     console.log("Profile ID:", req.params.id);
     console.log("Uploaded file (profileId):", req.file);

@@ -17,6 +17,7 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const userRoutes = require('./routes/userRoutes');
 const incomeTaxHelpRoutes = require('./routes/incomeTaxHelpRoutes');
 const manageExpenseRoutes = require('./routes/manageExpenseRoutes');
+const budgetRoutes = require('./routes/budgetRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -94,6 +95,7 @@ app.use('/api/profiles', profileRoutes); // Profile routes
 app.use('/api/users', userRoutes); // User routes
 app.use('/api/income-tax-help', incomeTaxHelpRoutes); // Income Tax Help form routes
 app.use('/api/manage-expense', manageExpenseRoutes); // Manage Expense form routes
+app.use('/api/budgets', budgetRoutes); // Budget routes
 
 // Health check endpoint - Enhanced with session info
 app.get('/api/health', (req, res) => {
@@ -271,10 +273,15 @@ app.get('/', (req, res) => {
     redirect: { live: `${baseUrl}/live` }
   });
 });
-// Live check endpoint - Lightweight response
+
+// Lightweight live text endpoint (no redirect)
+app.get('/live', (req, res) => {
+  res.send('Server is live and working successfully');
+});
+
+// Live check endpoint that redirects to `/`
 app.get('/status', (req, res) => {
-  res.send('Server is live and working successfully 🚀');
-  res.redirect('/');
+  return res.redirect('/');
 });
 
 // Session info endpoint

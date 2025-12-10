@@ -39,7 +39,8 @@ import {
   Cancel,
   HourglassEmpty,
   Visibility,
-  Download
+  Download,
+  AccountBalanceWallet
 } from '@mui/icons-material'
 import {
   LineChart,
@@ -59,6 +60,7 @@ import {
   AreaChart
 } from 'recharts'
 import api from '../config/api'
+import { useNavigate } from 'react-router-dom'
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#ff7c7c']
 
@@ -98,6 +100,7 @@ const StatCard = ({ title, value, icon, color, trend, trendValue }) => (
 )
 
 const Dashboard = () => {
+  const navigate = useNavigate()
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalExpenses: 0,
@@ -110,6 +113,7 @@ const Dashboard = () => {
   const [monthlyData, setMonthlyData] = useState([])
   const [manageExpenseData, setManageExpenseData] = useState({ submissions: [], stats: {} })
   const [incomeTaxHelpData, setIncomeTaxHelpData] = useState({ submissions: [], stats: {} })
+  const [budgetData, setBudgetData] = useState({ budgets: [], stats: {} }) // Add budget state
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [retryCount, setRetryCount] = useState(0)
@@ -248,6 +252,29 @@ const Dashboard = () => {
       } catch (incomeTaxHelpError) {
         console.error('Failed to fetch income tax help submissions:', incomeTaxHelpError)
         setIncomeTaxHelpData({ submissions: [], stats: {} })
+      }
+
+      // Fetch Budget data (add after income tax help fetch)
+      try {
+        console.log('Fetching budget data...')
+        const budgetRes = await api.get('/admin/budgets')
+        console.log('Budget response:', budgetRes.data)
+        
+        const budgets = budgetRes.data?.data || []
+        const totalBudgetAmount = budgets.reduce((sum, b) => sum + (b.totalBudget || 0), 0)
+        const uniqueUsers = new Set(budgets.map(b => b.userId?._id || b.userId)).size
+        
+        setBudgetData({
+          budgets,
+          stats: {
+            total: budgets.length,
+            totalAmount: totalBudgetAmount,
+            usersWithBudget: uniqueUsers
+          }
+        })
+      } catch (budgetError) {
+        console.error('Failed to fetch budget data:', budgetError)
+        setBudgetData({ budgets: [], stats: {} })
       }
 
       setLastFetchTime(new Date())
@@ -509,6 +536,16 @@ const Dashboard = () => {
             trendValue="submissions"
           />
         </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            title="Total Budgets"
+            value={budgetData.stats?.total || 0}
+            icon={<AccountBalanceWallet fontSize="large" />}
+            color="#4caf50"
+            trend={0}
+            trendValue="active budgets"
+          />
+        </Grid>
       </Grid>
 
       {/* Form Submissions Summary */}
@@ -594,6 +631,61 @@ const Dashboard = () => {
                 <Typography variant="h6" color="primary">
                   ${(incomeTaxHelpData.submissions.reduce((sum, item) => sum + (item.annualIncome || 0), 0)).toLocaleString()}
                 </Typography>
+              </Box>
+            </Box>
+          </Paper>
+        </Grid>
+
+        {/* Budget Summary - Add this new Grid item */}
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom display="flex" alignItems="center" gap={1}>
+              <AccountBalanceWallet color="primary" />
+              Budget Overview
+            </Typography>
+            <Box sx={{ mt: 2 }}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                <Typography variant="body2" color="textSecondary">Total Budgets</Typography>
+                <Chip 
+                  label={budgetData.stats?.total || 0} 
+                  color="primary" 
+                  size="small" 
+                />
+              </Box>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                <Typography variant="body2" color="textSecondary">Users with Budget</Typography>
+                <Chip 
+                  label={budgetData.stats?.usersWithBudget || 0} 
+                  color="info" 
+                  size="small" 
+                />
+              </Box>
+              <Divider sx={{ my: 2 }} />
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Typography variant="body1" fontWeight="bold">Total Budget Amount</Typography>
+                <Typography variant="h6" color="primary">
+                  ₹{(budgetData.stats?.totalAmount || 0).toLocaleString()}
+                </Typography>
+              </Box>
+              <Box sx={{ mt: 2 }}>
+                <Button 
+                  variant="contained" 
+                  size="small"
+                  fullWidth
+                  color="primary"
+                  startIcon={<AccountBalanceWallet />}
+                  onClick={() => navigate('/budgets')}
+                  sx={{
+                    py: 1,
+                    fontWeight: 'bold',
+                    boxShadow: 2,
+                    '&:hover': {
+                      boxShadow: 4,
+                    }
+                  }}
+                >
+                  Manage Budgets
+                </Button>
               </Box>
             </Box>
           </Paper>
@@ -830,6 +922,102 @@ const Dashboard = () => {
                       <TableCell colSpan={5} align="center">
                         <Typography color="textSecondary">
                           No income tax help requests yet
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* Budget Table - Add after Income Tax Help Table */}
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid item xs={12}>
+          <Paper sx={{ p: 3 }}>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="h6" display="flex" alignItems="center" gap={1}>
+                <AccountBalanceWallet color="primary" />
+                Recent Budgets
+              </Typography>
+              <Button 
+                variant="contained" 
+                size="small"
+                color="primary"
+                startIcon={<Visibility />}
+                onClick={() => navigate('/budgets')}
+              >
+                View All
+              </Button>
+            </Box>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>User</TableCell>
+                    <TableCell>Month/Year</TableCell>
+                    <TableCell align="right">Total Budget</TableCell>
+                    <TableCell>Categories</TableCell>
+                    <TableCell>Currency</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {budgetData.budgets.slice(0, 5).length > 0 ? (
+                    budgetData.budgets.slice(0, 5).map((budget) => (
+                      <TableRow key={budget._id}>
+                        <TableCell>
+                          <Box>
+                            <Typography variant="body2" fontWeight="bold">
+                              {budget.userId?.name || 'Unknown'}
+                            </Typography>
+                            <Typography variant="caption" color="textSecondary">
+                              {budget.userId?.email || ''}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={`${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][budget.month - 1]} ${budget.year}`}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2" fontWeight="bold" color="primary">
+                            ₹{(budget.totalBudget || 0).toLocaleString()}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={`${budget.categories?.length || 0} categories`}
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Chip label={budget.currency || 'INR'} size="small" variant="outlined" />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Tooltip title="View Details">
+                            <IconButton 
+                              size="small" 
+                              color="primary"
+                              onClick={() => window.location.href = '/budgets'}
+                            >
+                              <Visibility fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center">
+                        <Typography color="textSecondary">
+                          No budgets created yet
                         </Typography>
                       </TableCell>
                     </TableRow>

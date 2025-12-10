@@ -2,15 +2,18 @@ const TransactionHistory = require('../models/TransactionHistory');
 
 const createHistoryFromTransaction = async (data) => {
   try {
+    // Ensure type defaults to 'expense' if not provided
+    const transactionType = data.type || (data.amount < 0 ? 'expense' : 'income');
+    
     const historyEntry = new TransactionHistory({
       userId: data.userId,
-      date: data.date,
-      title: data.description || data.item,
-      amount: data.amount,
-      type: data.type, // Make sure this is included
-      category: data.category ?? null,
-      icon: data.icon ?? null,
-      note: data.note,
+      date: data.date || new Date(),
+      title: data.description || data.item || data.title || 'Untitled',
+      amount: Math.abs(data.amount), // Store as positive
+      type: transactionType,
+      category: data.category || 'Other',
+      icon: data.icon || 'receipt',
+      note: data.note || '',
       paymentMethod: data.paymentMethod || 'cash',
       status: data.status || 'completed'
     });
@@ -30,20 +33,20 @@ const getTransactionHistory = async (req, res) => {
       return res.status(401).json({ success: false, error: 'User not authenticated or user ID missing.' });
     }
     const userId = req.user._id;
-    const history = await TransactionHistory.find({ userId });
+    const history = await TransactionHistory.find({ userId }).sort({ date: -1 });
 
-    // Map to include only necessary fields (category and icon as null if missing)
+    // Map and provide defaults for null/missing fields
     const formattedHistory = history.map(entry => ({
       _id: entry._id,
       date: entry.date,
-      title: entry.title,
+      title: entry.title || entry.description || entry.item || 'Untitled',
       amount: entry.amount,
-      type: entry.type,
-      category: entry.category ?? null,
-      icon: entry.icon ?? null,
-      note: entry.note,
-      paymentMethod: entry.paymentMethod,
-      status: entry.status
+      type: entry.type || (entry.amount < 0 ? 'expense' : 'income'),
+      category: entry.category || 'Other',
+      icon: entry.icon || 'receipt',
+      note: entry.note || '',
+      paymentMethod: entry.paymentMethod || 'cash',
+      status: entry.status || 'completed'
     }));
 
     res.json({
@@ -52,6 +55,45 @@ const getTransactionHistory = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Server error', details: error.message });
+  }
+};
+
+// New: Get all transactions (for the /transaction-history route that returns "transactions")
+const getAllTransactions = async (req, res) => {
+  try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ success: false, error: 'User not authenticated or user ID missing.' });
+    }
+    const userId = req.user._id;
+    
+    // Try TransactionHistory first, fallback to Transaction model if needed
+    let transactions = await TransactionHistory.find({ userId }).sort({ createdAt: -1 });
+    
+    // Map and provide defaults for null/missing fields
+    const formattedTransactions = transactions.map(entry => ({
+      _id: entry._id,
+      userId: entry.userId,
+      item: entry.title || entry.item || entry.description || 'Untitled',
+      description: entry.description || entry.title || entry.item || '',
+      amount: entry.amount,
+      invoice: entry.invoice || null,
+      paymentMethod: entry.paymentMethod || 'cash',
+      status: entry.status || 'completed',
+      type: entry.type || (entry.amount < 0 ? 'expense' : 'income'),
+      category: entry.category || 'Other',
+      icon: entry.icon || 'receipt',
+      note: entry.note || '',
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+      date: entry.date || entry.createdAt
+    }));
+
+    res.json({
+      success: true,
+      transactions: formattedTransactions
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error', details: error.message });
   }
 };
 
@@ -93,6 +135,6 @@ const deleteTransactionHistory = async (req, res) => {
 module.exports = {
   createHistoryFromTransaction,
   getTransactionHistory,
+  getAllTransactions,
   deleteTransactionHistory,
-  // ...other exports
 };

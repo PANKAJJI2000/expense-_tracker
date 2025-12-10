@@ -78,7 +78,10 @@ const {
   getTrends,
   getCategoryStats,
   getMonthlyStats,
-  getTopUsers
+  getTopUsers,
+  getAllBudgets,
+  deleteBudgetAdmin,
+  updateBudgetAdmin
 } = adminController;
 
 // Verify each function before using it
@@ -692,6 +695,34 @@ router.put('/users/:id/profile-image', adminAuth, upload.single('profile'), asyn
     });
   }
 });
+
+// Budget management routes (Admin) - Optional check
+if (typeof getAllBudgets === 'function') {
+  router.get('/budgets', adminAuth, getAllBudgets);
+} else {
+  console.warn('⚠ getAllBudgets function not found');
+  router.get('/budgets', adminAuth, (req, res) => {
+    res.status(501).json({ success: false, message: 'Budget feature not implemented' });
+  });
+}
+
+if (typeof updateBudgetAdmin === 'function') {
+  router.put('/budgets/:id', adminAuth, updateBudgetAdmin);
+} else {
+  console.warn('⚠ updateBudgetAdmin function not found');
+  router.put('/budgets/:id', adminAuth, (req, res) => {
+    res.status(501).json({ success: false, message: 'Budget update not implemented' });
+  });
+}
+
+if (typeof deleteBudgetAdmin === 'function') {
+  router.delete('/budgets/:id', adminAuth, deleteBudgetAdmin);
+} else {
+  console.warn('⚠ deleteBudgetAdmin function not found');
+  router.delete('/budgets/:id', adminAuth, (req, res) => {
+    res.status(501).json({ success: false, message: 'Budget delete not implemented' });
+  });
+}
 
 console.log('✓ Admin routes configured successfully');
 

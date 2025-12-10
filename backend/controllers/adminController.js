@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Expense = require('../models/Expense');
 const Category = require('../models/Category');
+const Budget = require("../models/Budget");
 
 // Import additional models
 let AutoExpense, Profile, Transaction, TransactionHistory;
@@ -1349,6 +1350,113 @@ const bulkVerifyUsers = async (req, res) => {
   }
 };
 
+// Budget Management
+// @desc    Get all budgets (Admin)
+// @route   GET /api/admin/budgets
+// @access  Private/Admin
+const getAllBudgets = async (req, res) => {
+  try {
+    const { page = 1, limit = 50, month, year, userId } = req.query;
+
+    const query = {};
+    if (month) query.month = parseInt(month);
+    if (year) query.year = parseInt(year);
+    if (userId) query.userId = userId;
+
+    const budgets = await Budget.find(query)
+      .populate("userId", "name email")
+      .sort({ year: -1, month: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Budget.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      count: budgets.length,
+      total,
+      totalPages: Math.ceil(total / limit),
+      currentPage: parseInt(page),
+      data: budgets,
+    });
+  } catch (error) {
+    console.error("Get All Budgets Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Update budget (Admin)
+// @route   PUT /api/admin/budgets/:id
+// @access  Private/Admin
+const updateBudgetAdmin = async (req, res) => {
+  try {
+    const { totalBudget, notes, categories, currency } = req.body;
+
+    const budget = await Budget.findById(req.params.id);
+
+    if (!budget) {
+      return res.status(404).json({
+        success: false,
+        message: "Budget not found",
+      });
+    }
+
+    // Update fields
+    if (totalBudget !== undefined) budget.totalBudget = totalBudget;
+    if (notes !== undefined) budget.notes = notes;
+    if (categories !== undefined) budget.categories = categories;
+    if (currency !== undefined) budget.currency = currency;
+
+    await budget.save();
+
+    // Populate user info for response
+    await budget.populate("userId", "name email");
+
+    res.status(200).json({
+      success: true,
+      message: "Budget updated successfully",
+      data: budget,
+    });
+  } catch (error) {
+    console.error("Update Budget Admin Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Delete budget (Admin)
+// @route   DELETE /api/admin/budgets/:id
+// @access  Private/Admin
+const deleteBudgetAdmin = async (req, res) => {
+  try {
+    const budget = await Budget.findByIdAndDelete(req.params.id);
+
+    if (!budget) {
+      return res.status(404).json({
+        success: false,
+        message: "Budget not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Budget deleted successfully",
+      data: budget,
+    });
+  } catch (error) {
+    console.error("Delete Budget Admin Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   adminLogin,
   verifyAdmin,
@@ -1392,5 +1500,9 @@ module.exports = {
   resendUserVerification,
   getEmailVerificationStats,
   getUnverifiedUsers,
-  bulkVerifyUsers
+  bulkVerifyUsers,
+  // Budget management
+  getAllBudgets,
+  deleteBudgetAdmin,
+  updateBudgetAdmin
 };
