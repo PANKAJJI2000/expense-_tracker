@@ -1411,8 +1411,6 @@ const updateBudgetAdmin = async (req, res) => {
     if (currency !== undefined) budget.currency = currency;
 
     await budget.save();
-
-    // Populate user info for response
     await budget.populate("userId", "name email");
 
     res.status(200).json({

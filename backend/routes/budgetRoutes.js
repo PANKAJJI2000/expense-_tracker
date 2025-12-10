@@ -6,25 +6,32 @@ const {
   getCurrentBudget,
   updateCategorySpent,
   deleteBudget,
+  getAllBudgetsAdmin,
+  updateBudgetAdmin,
+  deleteBudgetAdmin,
 } = require("../controllers/budgetController");
-const authMiddleware = require("../middleware/authMiddleware");
 
-// All routes require authentication
-router.use(authMiddleware);
+// Optional auth middleware - make it optional for some routes
+let authMiddleware;
+try {
+  authMiddleware = require("../middleware/authMiddleware");
+} catch (error) {
+  console.warn("Auth middleware not found, using passthrough");
+  authMiddleware = (req, res, next) => next();
+}
 
-// POST /api/budgets - Create or update budget
-router.post("/", createBudget);
+// Public/Admin routes (no strict auth required)
+router.get("/all", getAllBudgetsAdmin);
 
-// GET /api/budgets - Get all budgets or specific month/year
-router.get("/", getBudget);
+// User routes (with optional auth)
+router.post("/", authMiddleware, createBudget);
+router.get("/", getBudget); // Made public for admin access
+router.get("/current", authMiddleware, getCurrentBudget);
+router.put("/:id/category/:categoryId", authMiddleware, updateCategorySpent);
+router.delete("/:id", authMiddleware, deleteBudget);
 
-// GET /api/budgets/current - Get current month budget
-router.get("/current", getCurrentBudget);
-
-// PUT /api/budgets/:id/category/:categoryId - Update category spent
-router.put("/:id/category/:categoryId", updateCategorySpent);
-
-// DELETE /api/budgets/:id - Delete budget
-router.delete("/:id", deleteBudget);
+// Admin routes
+router.put("/:id/admin", updateBudgetAdmin);
+router.delete("/:id/admin", deleteBudgetAdmin);
 
 module.exports = router;

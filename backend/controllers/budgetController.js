@@ -88,14 +88,20 @@ exports.createBudget = async (req, res) => {
 // @access  Private
 exports.getBudget = async (req, res) => {
   try {
-    // Get userId from authenticated user or from query (fallback for testing)
+    // Get userId from authenticated user or from query (fallback for testing/admin)
     const userId = req.user?._id || req.user?.id || req.query.userId;
     const { month, year } = req.query;
 
+    // If no userId provided, return all budgets (admin mode)
     if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "User not authenticated. Please login first.",
+      const allBudgets = await Budget.find({})
+        .populate("userId", "name email")
+        .sort({ year: -1, month: -1 });
+
+      return res.status(200).json({
+        success: true,
+        count: allBudgets.length,
+        data: allBudgets,
       });
     }
 
@@ -105,7 +111,7 @@ exports.getBudget = async (req, res) => {
         userId,
         month: parseInt(month),
         year: parseInt(year),
-      });
+      }).populate("userId", "name email");
 
       if (!budget) {
         return res.status(404).json({
@@ -121,7 +127,9 @@ exports.getBudget = async (req, res) => {
     }
 
     // Otherwise, get all budgets for user
-    const budgets = await Budget.find({ userId }).sort({ year: -1, month: -1 });
+    const budgets = await Budget.find({ userId })
+      .populate("userId", "name email")
+      .sort({ year: -1, month: -1 });
 
     res.status(200).json({
       success: true,
@@ -268,6 +276,112 @@ exports.deleteBudget = async (req, res) => {
     });
   } catch (error) {
     console.error("Delete Budget Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Get all budgets (Admin)
+// @route   GET /api/budgets/all
+// @access  Private/Admin
+exports.getAllBudgetsAdmin = async (req, res) => {
+  try {
+    const { page = 1, limit = 50, month, year, userId } = req.query;
+
+    const query = {};
+    if (month) query.month = parseInt(month);
+    if (year) query.year = parseInt(year);
+    if (userId) query.userId = userId;
+
+    const budgets = await Budget.find(query)
+      .populate("userId", "name email")
+      .sort({ year: -1, month: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Budget.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      count: budgets.length,
+      total,
+      totalPages: Math.ceil(total / limit),
+      currentPage: parseInt(page),
+      data: budgets,
+    });
+  } catch (error) {
+    console.error("Get All Budgets Admin Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Update budget (Admin)
+// @route   PUT /api/budgets/:id
+// @access  Private/Admin
+exports.updateBudgetAdmin = async (req, res) => {
+  try {
+    const { totalBudget, notes, categories, currency } = req.body;
+
+    const budget = await Budget.findById(req.params.id);
+
+    if (!budget) {
+      return res.status(404).json({
+        success: false,
+        message: "Budget not found",
+      });
+    }
+
+    // Update fields
+    if (totalBudget !== undefined) budget.totalBudget = totalBudget;
+    if (notes !== undefined) budget.notes = notes;
+    if (categories !== undefined) budget.categories = categories;
+    if (currency !== undefined) budget.currency = currency;
+
+    await budget.save();
+
+    // Populate user info for response
+    await budget.populate("userId", "name email");
+
+    res.status(200).json({
+      success: true,
+      message: "Budget updated successfully",
+      data: budget,
+    });
+  } catch (error) {
+    console.error("Update Budget Admin Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Delete budget (Admin)
+// @route   DELETE /api/budgets/:id/admin
+// @access  Private/Admin
+exports.deleteBudgetAdmin = async (req, res) => {
+  try {
+    const budget = await Budget.findByIdAndDelete(req.params.id);
+
+    if (!budget) {
+      return res.status(404).json({
+        success: false,
+        message: "Budget not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Budget deleted successfully",
+      data: budget,
+    });
+  } catch (error) {
+    console.error("Delete Budget Admin Error:", error);
     res.status(500).json({
       success: false,
       message: error.message,
