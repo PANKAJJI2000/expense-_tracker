@@ -15,6 +15,7 @@ import TransactionHistory from './pages/TransactionHistory'
 import Budget from './pages/Budget'
 import ManageExpenses from './pages/ManageExpenses'
 import IncomeTaxHelp from './pages/IncomeTaxHelp'
+import Settings from './pages/Settings'
 
 function App() {
   return (
@@ -43,6 +44,8 @@ function App() {
             <Route path="budgets" element={<Budget />} />
             <Route path="manage-expenses" element={<ManageExpenses />} />
             <Route path="income-tax-help" element={<IncomeTaxHelp />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="sessions" element={<>Sessions Page</>} />
           </Route>
         </Routes>
       </Router>

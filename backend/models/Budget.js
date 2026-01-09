@@ -7,6 +7,11 @@ const budgetSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    totalBudget: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
     month: {
       type: Number, // 1-12
       min: 1,
@@ -15,24 +20,27 @@ const budgetSchema = new mongoose.Schema(
     year: {
       type: Number,
     },
-    totalBudget: {
-      type: Number,
-      required: [true, "Total budget amount is required"],
-      min: 0,
-    },
     currency: {
       type: String,
       default: "INR",
     },
+    categories: [
+      {
+        name: String,
+        amount: Number,
+        spent: { type: Number, default: 0 },
+      },
+    ],
     notes: {
       type: String,
-      default: "",
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-// Compound index to ensure one budget per user per month/year
-budgetSchema.index({ userId: 1, month: 1, year: 1 }, { unique: true });
+// Index for faster queries
+budgetSchema.index({ userId: 1, month: 1, year: 1 });
 
 module.exports = mongoose.model("Budget", budgetSchema);

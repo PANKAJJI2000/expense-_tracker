@@ -260,21 +260,38 @@ const Dashboard = () => {
         const budgetRes = await api.get('/admin/budgets')
         console.log('Budget response:', budgetRes.data)
         
-        const budgets = budgetRes.data?.data || []
-        const totalBudgetAmount = budgets.reduce((sum, b) => sum + (b.totalBudget || 0), 0)
-        const uniqueUsers = new Set(budgets.map(b => b.userId?._id || b.userId)).size
+        // Handle different response structures
+        let budgets = []
+        if (Array.isArray(budgetRes.data)) {
+          budgets = budgetRes.data
+        } else if (budgetRes.data?.data && Array.isArray(budgetRes.data.data)) {
+          budgets = budgetRes.data.data
+        } else if (budgetRes.data?.budgets && Array.isArray(budgetRes.data.budgets)) {
+          budgets = budgetRes.data.budgets
+        }
+        
+        console.log('Parsed budgets:', budgets, 'Count:', budgets.length)
+        
+        const totalBudgetAmount = budgets.reduce((sum, b) => sum + (Number(b.totalBudget) || Number(b.amount) || 0), 0)
+        const uniqueUsers = new Set(budgets.map(b => b.userId?._id || b.userId || b.user?._id || b.user)).size
         
         setBudgetData({
           budgets,
           stats: {
             total: budgets.length,
             totalAmount: totalBudgetAmount,
-            usersWithBudget: uniqueUsers
+            usersWithBudget: uniqueUsers || budgets.length
           }
+        })
+        
+        console.log('Budget stats set:', {
+          total: budgets.length,
+          totalAmount: totalBudgetAmount,
+          usersWithBudget: uniqueUsers
         })
       } catch (budgetError) {
         console.error('Failed to fetch budget data:', budgetError)
-        setBudgetData({ budgets: [], stats: {} })
+        setBudgetData({ budgets: [], stats: { total: 0, totalAmount: 0, usersWithBudget: 0 } })
       }
 
       setLastFetchTime(new Date())
