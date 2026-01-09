@@ -636,7 +636,7 @@ const Dashboard = () => {
           </Paper>
         </Grid>
 
-        {/* Budget Summary - Add this new Grid item */}
+        {/* Budget Summary */}
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom display="flex" alignItems="center" gap={1}>
@@ -666,26 +666,6 @@ const Dashboard = () => {
                 <Typography variant="h6" color="primary">
                   ₹{(budgetData.stats?.totalAmount || 0).toLocaleString()}
                 </Typography>
-              </Box>
-              <Box sx={{ mt: 2 }}>
-                <Button 
-                  variant="contained" 
-                  size="small"
-                  fullWidth
-                  color="primary"
-                  startIcon={<AccountBalanceWallet />}
-                  onClick={() => navigate('/budgets')}
-                  sx={{
-                    py: 1,
-                    fontWeight: 'bold',
-                    boxShadow: 2,
-                    '&:hover': {
-                      boxShadow: 4,
-                    }
-                  }}
-                >
-                  Manage Budgets
-                </Button>
               </Box>
             </Box>
           </Paper>
@@ -781,18 +761,9 @@ const Dashboard = () => {
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography variant="h6">
-                Recent Manage Expense Submissions
-              </Typography>
-              <Button 
-                variant="outlined" 
-                size="small"
-                onClick={() => window.location.href = '/manage-expenses'}
-              >
-                View All
-              </Button>
-            </Box>
+            <Typography variant="h6" mb={2}>
+              Recent Manage Expense Submissions
+            </Typography>
             <TableContainer>
               <Table>
                 <TableHead>
@@ -859,18 +830,9 @@ const Dashboard = () => {
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography variant="h6">
-                Recent Income Tax Help Requests
-              </Typography>
-              <Button 
-                variant="outlined" 
-                size="small"
-                onClick={() => window.location.href = '/income-tax-help'}
-              >
-                View All
-              </Button>
-            </Box>
+            <Typography variant="h6" mb={2}>
+              Recent Income Tax Help Requests
+            </Typography>
             <TableContainer>
               <Table>
                 <TableHead>
@@ -933,25 +895,14 @@ const Dashboard = () => {
         </Grid>
       </Grid>
 
-      {/* Budget Table - Add after Income Tax Help Table */}
+      {/* Budget Table */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography variant="h6" display="flex" alignItems="center" gap={1}>
-                <AccountBalanceWallet color="primary" />
-                Recent Budgets
-              </Typography>
-              <Button 
-                variant="contained" 
-                size="small"
-                color="primary"
-                startIcon={<Visibility />}
-                onClick={() => navigate('/budgets')}
-              >
-                View All
-              </Button>
-            </Box>
+            <Typography variant="h6" display="flex" alignItems="center" gap={1} mb={2}>
+              <AccountBalanceWallet color="primary" />
+              Recent Budgets
+            </Typography>
             <TableContainer>
               <Table>
                 <TableHead>
@@ -959,9 +910,8 @@ const Dashboard = () => {
                     <TableCell>User</TableCell>
                     <TableCell>Month/Year</TableCell>
                     <TableCell align="right">Total Budget</TableCell>
-                    <TableCell>Categories</TableCell>
                     <TableCell>Currency</TableCell>
-                    <TableCell align="right">Actions</TableCell>
+                    <TableCell>Notes</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -980,7 +930,9 @@ const Dashboard = () => {
                         </TableCell>
                         <TableCell>
                           <Chip
-                            label={`${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][budget.month - 1]} ${budget.year}`}
+                            label={budget.month && budget.year 
+                              ? `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][budget.month - 1]} ${budget.year}`
+                              : 'No Period'}
                             size="small"
                             color="primary"
                             variant="outlined"
@@ -992,30 +944,18 @@ const Dashboard = () => {
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          <Chip
-                            label={`${budget.categories?.length || 0} categories`}
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>
                           <Chip label={budget.currency || 'INR'} size="small" variant="outlined" />
                         </TableCell>
-                        <TableCell align="right">
-                          <Tooltip title="View Details">
-                            <IconButton 
-                              size="small" 
-                              color="primary"
-                              onClick={() => window.location.href = '/budgets'}
-                            >
-                              <Visibility fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                        <TableCell>
+                          <Typography variant="caption" color="textSecondary">
+                            {budget.notes || '-'}
+                          </Typography>
                         </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={6} align="center">
+                      <TableCell colSpan={5} align="center">
                         <Typography color="textSecondary">
                           No budgets created yet
                         </Typography>

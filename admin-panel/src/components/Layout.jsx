@@ -24,7 +24,10 @@ import {
   Dashboard,
   People,
   Receipt,
-  Category,
+  Description,
+  AccountBalance,
+  AccountBalanceWallet,
+  Settings,
   Logout,
   AccountCircle,
   Schedule,
@@ -41,12 +44,15 @@ const menuItems = [
   { text: 'Dashboard', icon: <Dashboard />, path: '/' },
   { text: 'Users', icon: <People />, path: '/users' },
   { text: 'Expenses', icon: <Receipt />, path: '/expenses' },
-  { text: 'Categories', icon: <Category />, path: '/categories' },
   { text: 'Auto Expenses', icon: <Schedule />, path: '/auto-expenses' },
   { text: 'Profiles', icon: <Person />, path: '/profiles' },
   { text: 'Transactions', icon: <Payment />, path: '/transactions' },
   { text: 'History', icon: <History />, path: '/transaction-history' },
+  { text: 'Manage Expenses', icon: <Description />, path: '/manage-expenses' },
+  { text: 'Income Tax Help', icon: <AccountBalance />, path: '/income-tax-help' },
+  { text: 'Budgets', icon: <AccountBalanceWallet />, path: '/budgets' },
   { text: 'Sessions', icon: <Lock />, path: '/sessions' }, // Added
+  { text: 'Settings', icon: <Settings />, path: '/settings' },
 ]
 
 const Layout = () => {

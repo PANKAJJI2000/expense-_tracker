@@ -4,7 +4,6 @@ const {
   createBudget,
   getBudget,
   getCurrentBudget,
-  updateCategorySpent,
   deleteBudget,
   getAllBudgetsAdmin,
   updateBudgetAdmin,
@@ -27,11 +26,10 @@ router.get("/all", getAllBudgetsAdmin);
 router.post("/", authMiddleware, createBudget);
 router.get("/", getBudget); // Made public for admin access
 router.get("/current", authMiddleware, getCurrentBudget);
-router.put("/:id/category/:categoryId", authMiddleware, updateCategorySpent);
 router.delete("/:id", authMiddleware, deleteBudget);
 
 // Admin routes
-router.put("/:id/admin", updateBudgetAdmin);
+router.put("/:id", updateBudgetAdmin);
 router.delete("/:id/admin", deleteBudgetAdmin);
 
 module.exports = router;

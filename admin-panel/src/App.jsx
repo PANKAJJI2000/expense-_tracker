@@ -13,6 +13,8 @@ import Profiles from './pages/Profiles'
 import Transactions from './pages/Transactions'
 import TransactionHistory from './pages/TransactionHistory'
 import Budget from './pages/Budget'
+import ManageExpenses from './pages/ManageExpenses'
+import IncomeTaxHelp from './pages/IncomeTaxHelp'
 
 function App() {
   return (
@@ -38,7 +40,9 @@ function App() {
             <Route path="profiles" element={<Profiles />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="transaction-history" element={<TransactionHistory />} />
-            <Route path="/budgets" element={<Budget />} /> {/* Add this route */}
+            <Route path="budgets" element={<Budget />} />
+            <Route path="manage-expenses" element={<ManageExpenses />} />
+            <Route path="income-tax-help" element={<IncomeTaxHelp />} />
           </Route>
         </Routes>
       </Router>

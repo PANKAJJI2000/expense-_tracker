@@ -4,9 +4,10 @@ const mongoose = require("mongoose");
 // @desc    Create or update monthly budget
 // @route   POST /api/budgets
 // @access  Private
+
 exports.createBudget = async (req, res) => {
   try {
-    const { month, year, totalBudget, categories, currency, notes } = req.body;
+    const { month, year, totalBudget, currency, notes } = req.body;
     
     // Get userId from authenticated user or from body (fallback for testing)
     const userId = req.user?._id || req.user?.id || req.body.userId;
@@ -27,11 +28,11 @@ exports.createBudget = async (req, res) => {
       });
     }
 
-    // Validate required fields
-    if (!month || !year || totalBudget === undefined) {
+    // Validate required field
+    if (totalBudget === undefined) {
       return res.status(400).json({
         success: false,
-        message: "Month, year, and totalBudget are required",
+        message: "totalBudget is required",
       });
     }
 
@@ -39,17 +40,17 @@ exports.createBudget = async (req, res) => {
     const existingBudget = await Budget.findOne({ userId, month, year });
 
     if (existingBudget) {
-      // Update existing budget
+      // Update existing budget and remove categories if they exist
       const updatedBudget = await Budget.findByIdAndUpdate(
         existingBudget._id,
         {
           totalBudget,
-          categories: categories || existingBudget.categories,
           currency: currency || existingBudget.currency,
           notes: notes !== undefined ? notes : existingBudget.notes,
+          $unset: { categories: 1 } // Remove categories field
         },
         { new: true, runValidators: true }
-      );
+      ).select('-categories');
 
       return res.status(200).json({
         success: true,
@@ -64,7 +65,6 @@ exports.createBudget = async (req, res) => {
       month,
       year,
       totalBudget,
-      categories: categories || [],
       currency: currency || "INR",
       notes: notes || "",
     });
@@ -95,6 +95,7 @@ exports.getBudget = async (req, res) => {
     // If no userId provided, return all budgets (admin mode)
     if (!userId) {
       const allBudgets = await Budget.find({})
+        .select('-categories')
         .populate("userId", "name email")
         .sort({ year: -1, month: -1 });
 
@@ -111,7 +112,9 @@ exports.getBudget = async (req, res) => {
         userId,
         month: parseInt(month),
         year: parseInt(year),
-      }).populate("userId", "name email");
+      })
+        .select('-categories')
+        .populate("userId", "name email");
 
       if (!budget) {
         return res.status(404).json({
@@ -128,6 +131,7 @@ exports.getBudget = async (req, res) => {
 
     // Otherwise, get all budgets for user
     const budgets = await Budget.find({ userId })
+      .select('-categories')
       .populate("userId", "name email")
       .sort({ year: -1, month: -1 });
 
@@ -168,7 +172,7 @@ exports.getCurrentBudget = async (req, res) => {
       userId,
       month: currentMonth,
       year: currentYear,
-    });
+    }).select('-categories');
 
     if (!budget) {
       return res.status(404).json({
@@ -178,7 +182,6 @@ exports.getCurrentBudget = async (req, res) => {
           month: currentMonth,
           year: currentYear,
           totalBudget: 0,
-          categories: [],
         },
       });
     }
@@ -190,56 +193,6 @@ exports.getCurrentBudget = async (req, res) => {
   } catch (error) {
     console.error("Get Current Budget Error:", error);
     res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// @desc    Update category spent amount
-// @route   PUT /api/budgets/:id/category/:categoryId
-// @access  Private
-exports.updateCategorySpent = async (req, res) => {
-  try {
-    const { id, categoryId } = req.params;
-    const { spent } = req.body;
-    const userId = req.user?._id || req.user?.id || req.body.userId;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "User not authenticated. Please login first.",
-      });
-    }
-
-    const budget = await Budget.findOne({ _id: id, userId });
-
-    if (!budget) {
-      return res.status(404).json({
-        success: false,
-        message: "Budget not found",
-      });
-    }
-
-    const category = budget.categories.id(categoryId);
-    if (!category) {
-      return res.status(404).json({
-        success: false,
-        message: "Category not found in budget",
-      });
-    }
-
-    category.spent = spent;
-    await budget.save();
-
-    res.status(200).json({
-      success: true,
-      message: "Category spent updated",
-      data: budget,
-    });
-  } catch (error) {
-    console.error("Update Category Spent Error:", error);
-    res.status(400).json({
       success: false,
       message: error.message,
     });
@@ -296,6 +249,7 @@ exports.getAllBudgetsAdmin = async (req, res) => {
     if (userId) query.userId = userId;
 
     const budgets = await Budget.find(query)
+      .select('-categories')
       .populate("userId", "name email")
       .sort({ year: -1, month: -1 })
       .limit(limit * 1)
@@ -325,7 +279,7 @@ exports.getAllBudgetsAdmin = async (req, res) => {
 // @access  Private/Admin
 exports.updateBudgetAdmin = async (req, res) => {
   try {
-    const { totalBudget, notes, categories, currency } = req.body;
+    const { totalBudget, notes, currency, month, year } = req.body;
 
     const budget = await Budget.findById(req.params.id);
 
@@ -339,18 +293,26 @@ exports.updateBudgetAdmin = async (req, res) => {
     // Update fields
     if (totalBudget !== undefined) budget.totalBudget = totalBudget;
     if (notes !== undefined) budget.notes = notes;
-    if (categories !== undefined) budget.categories = categories;
     if (currency !== undefined) budget.currency = currency;
+    if (month !== undefined) budget.month = month;
+    if (year !== undefined) budget.year = year;
+    
+    // Remove categories if they exist
+    budget.categories = undefined;
 
     await budget.save();
 
-    // Populate user info for response
+    // Populate user info for response and exclude categories
     await budget.populate("userId", "name email");
+
+    // Convert to object and remove categories
+    const budgetObj = budget.toObject();
+    delete budgetObj.categories;
 
     res.status(200).json({
       success: true,
       message: "Budget updated successfully",
-      data: budget,
+      data: budgetObj,
     });
   } catch (error) {
     console.error("Update Budget Admin Error:", error);

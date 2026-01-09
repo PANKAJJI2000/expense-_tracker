@@ -3,12 +3,10 @@ import {
   Box,
   Typography,
   Divider,
-  IconButton,
   List,
   ListItem,
   ListItemIcon,
   ListItemText,
-  Tooltip
 } from '@mui/material'
 import {
   Dashboard,
@@ -20,33 +18,27 @@ import {
   SwapHoriz,
   History,
   Lock,
-  AccountBalanceWallet
+  AccountBalanceWallet,
+  Description,
+  AccountBalance
 } from '@mui/icons-material'
-import { useLocation, useNavigate } from 'react-router-dom'
-import api from '../config/api'
+import { NavLink } from 'react-router-dom'
 
 const Sidebar = () => {
-  const location = useLocation()
-  const navigate = useNavigate()
-
   const menuItems = [
     { text: 'Dashboard', icon: <Dashboard />, path: '/' },
     { text: 'Users', icon: <People />, path: '/users' },
     { text: 'Expenses', icon: <Receipt />, path: '/expenses' },
     { text: 'Categories', icon: <Category />, path: '/categories' },
     { text: 'Auto Expenses', icon: <Schedule />, path: '/auto-expenses' },
+    { text: 'Manage Expenses', icon: <Description />, path: '/manage-expenses' },
+    { text: 'Income Tax Help', icon: <AccountBalance />, path: '/income-tax-help' },
+    { text: 'Budgets', icon: <AccountBalanceWallet />, path: '/budgets' },
     { text: 'Profiles', icon: <Person />, path: '/profiles' },
     { text: 'Transactions', icon: <SwapHoriz />, path: '/transactions' },
     { text: 'History', icon: <History />, path: '/history' },
     { text: 'Sessions', icon: <Lock />, path: '/sessions' },
-    { text: 'Budgets', icon: <AccountBalanceWallet />, path: '/budgets' },
   ]
-
-  const handleItemClick = (path) => {
-    if (location.pathname !== path) {
-      navigate(path)
-    }
-  }
 
   return (
     <Box
@@ -72,15 +64,28 @@ const Sidebar = () => {
         <List>
           {menuItems.map((item) => (
             <ListItem
-              button
               key={item.text}
-              onClick={() => handleItemClick(item.path)}
-              selected={location.pathname === item.path}
+              disablePadding
+              sx={{ display: 'block' }}
             >
-              <ListItemIcon>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText primary={item.text} />
+              <NavLink
+                to={item.path}
+                end={item.path === '/'}
+                style={({ isActive }) => ({
+                  textDecoration: 'none',
+                  color: 'inherit',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '8px 16px',
+                  backgroundColor: isActive ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
+                  borderRight: isActive ? '3px solid #1976d2' : 'none',
+                })}
+              >
+                <ListItemIcon sx={{ minWidth: 40 }}>
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText primary={item.text} />
+              </NavLink>
             </ListItem>
           ))}
         </List>

@@ -9,46 +9,17 @@ const budgetSchema = new mongoose.Schema(
     },
     month: {
       type: Number, // 1-12
-      required: [true, "Month is required"],
       min: 1,
       max: 12,
     },
     year: {
       type: Number,
-      required: [true, "Year is required"],
     },
     totalBudget: {
       type: Number,
       required: [true, "Total budget amount is required"],
       min: 0,
     },
-    categories: [
-      {
-        name: {
-          type: String,
-          required: true,
-          trim: true,
-        },
-        amount: {
-          type: Number,
-          required: true,
-          min: 0,
-        },
-        spent: {
-          type: Number,
-          default: 0,
-          min: 0,
-        },
-        icon: {
-          type: String,
-          default: "wallet",
-        },
-        color: {
-          type: String,
-          default: "#4CAF50",
-        },
-      },
-    ],
     currency: {
       type: String,
       default: "INR",

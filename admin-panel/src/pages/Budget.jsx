@@ -25,7 +25,6 @@ import {
   CircularProgress,
   Alert,
   Tooltip,
-  LinearProgress,
   Divider,
   MenuItem,
   Select,
@@ -43,7 +42,6 @@ import {
   People,
   CalendarMonth,
   FilterList,
-  Add,
   Edit,
   Save
 } from '@mui/icons-material'
@@ -108,8 +106,8 @@ const Budget = () => {
       setLoading(true)
       setError(null)
       
-      console.log('Fetching budgets from /admin/budgets...')
-      const response = await api.get('/admin/budgets')
+      console.log('Fetching budgets from /budgets/all...')
+      const response = await api.get('/budgets/all')
       console.log('Budgets response:', response.data)
       
       // Handle different response formats
@@ -172,7 +170,7 @@ const Budget = () => {
     if (!selectedBudget) return
     
     try {
-      await api.delete(`/admin/budgets/${selectedBudget._id}`)
+      await api.delete(`/budgets/${selectedBudget._id}/admin`)
       setBudgets(budgets.filter(b => b._id !== selectedBudget._id))
       setDeleteDialogOpen(false)
       setSelectedBudget(null)
@@ -188,7 +186,9 @@ const Budget = () => {
       ...budget,
       totalBudget: budget.totalBudget || 0,
       notes: budget.notes || '',
-      categories: budget.categories || []
+      month: budget.month,
+      year: budget.year,
+      currency: budget.currency || 'INR'
     })
     setEditDialogOpen(true)
   }
@@ -200,12 +200,14 @@ const Budget = () => {
       setEditLoading(true)
       
       const updateData = {
-        totalBudget: editBudget.totalBudget,
-        notes: editBudget.notes,
-        categories: editBudget.categories
+        totalBudget: editBudget.totalBudget || 0,
+        notes: editBudget.notes || '',
+        month: editBudget.month,
+        year: editBudget.year,
+        currency: editBudget.currency || 'INR'
       }
       
-      await api.put(`/admin/budgets/${editBudget._id}`, updateData)
+      await api.put(`/budgets/${editBudget._id}`, updateData)
       
       setSnackbar({ 
         open: true, 
@@ -214,7 +216,7 @@ const Budget = () => {
       })
       setEditDialogOpen(false)
       setEditBudget(null)
-      fetchBudgets() // Refresh data
+      fetchBudgets()
     } catch (err) {
       console.error('Failed to update budget:', err)
       setSnackbar({ 
@@ -225,30 +227,6 @@ const Budget = () => {
     } finally {
       setEditLoading(false)
     }
-  }
-
-  const handleCategoryChange = (index, field, value) => {
-    const updatedCategories = [...editBudget.categories]
-    updatedCategories[index] = {
-      ...updatedCategories[index],
-      [field]: field === 'amount' || field === 'spent' ? Number(value) || 0 : value
-    }
-    setEditBudget({ ...editBudget, categories: updatedCategories })
-  }
-
-  const handleAddCategory = () => {
-    setEditBudget({
-      ...editBudget,
-      categories: [
-        ...editBudget.categories,
-        { name: '', amount: 0, spent: 0, color: '#1976d2' }
-      ]
-    })
-  }
-
-  const handleRemoveCategory = (index) => {
-    const updatedCategories = editBudget.categories.filter((_, i) => i !== index)
-    setEditBudget({ ...editBudget, categories: updatedCategories })
   }
 
   const handleChangePage = (event, newPage) => {
@@ -277,18 +255,6 @@ const Budget = () => {
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
   )
-
-  const calculateSpentPercentage = (budget) => {
-    if (!budget.categories || budget.categories.length === 0) return 0
-    const totalSpent = budget.categories.reduce((sum, cat) => sum + (cat.spent || 0), 0)
-    return budget.totalBudget > 0 ? Math.min((totalSpent / budget.totalBudget) * 100, 100) : 0
-  }
-
-  const getSpentColor = (percentage) => {
-    if (percentage >= 90) return 'error'
-    if (percentage >= 70) return 'warning'
-    return 'success'
-  }
 
   const currentYear = new Date().getFullYear()
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i)
@@ -415,29 +381,18 @@ const Budget = () => {
             </FormControl>
           </Grid>
           <Grid item xs={12} md={4}>
-            <Box display="flex" gap={1}>
-              <Button
-                startIcon={<FilterList />}
-                onClick={() => {
-                  setSearchTerm('')
-                  setFilterMonth('')
-                  setFilterYear('')
-                }}
-                size="small"
-                variant="text"
-              >
-                Clear Filters
-              </Button>
-              <Button
-                variant="contained"
-                size="small"
-                color="primary"
-                startIcon={<AccountBalanceWallet />}
-                onClick={() => navigate('/budgets')}
-              >
-                Manage All
-              </Button>
-            </Box>
+            <Button
+              startIcon={<FilterList />}
+              onClick={() => {
+                setSearchTerm('')
+                setFilterMonth('')
+                setFilterYear('')
+              }}
+              size="small"
+              variant="text"
+            >
+              Clear Filters
+            </Button>
           </Grid>
         </Grid>
       </Paper>
@@ -451,99 +406,82 @@ const Budget = () => {
                 <TableCell>User</TableCell>
                 <TableCell>Month/Year</TableCell>
                 <TableCell align="right">Total Budget</TableCell>
-                <TableCell>Categories</TableCell>
-                <TableCell>Spent Progress</TableCell>
                 <TableCell>Currency</TableCell>
+                <TableCell>Notes</TableCell>
                 <TableCell align="center">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {paginatedBudgets.length > 0 ? (
-                paginatedBudgets.map((budget) => {
-                  const spentPercentage = calculateSpentPercentage(budget)
-                  return (
-                    <TableRow key={budget._id} hover>
-                      <TableCell>
-                        <Box>
-                          <Typography variant="body2" fontWeight="bold">
-                            {budget.userId?.name || 'Unknown User'}
-                          </Typography>
-                          <Typography variant="caption" color="textSecondary">
-                            {budget.userId?.email || 'No email'}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={`${MONTHS[(budget.month || 1) - 1]} ${budget.year || ''}`}
+                paginatedBudgets.map((budget) => (
+                  <TableRow key={budget._id} hover>
+                    <TableCell>
+                      <Box>
+                        <Typography variant="body2" fontWeight="bold">
+                          {budget.userId?.name || 'Unknown User'}
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary">
+                          {budget.userId?.email || 'No email'}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={budget.month && budget.year 
+                          ? `${MONTHS[(budget.month || 1) - 1]} ${budget.year}` 
+                          : 'No Period'}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body1" fontWeight="bold" color="primary">
+                        ₹{(budget.totalBudget || 0).toLocaleString()}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip label={budget.currency || 'INR'} size="small" variant="outlined" />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="caption" color="textSecondary" noWrap sx={{ maxWidth: 150, display: 'block' }}>
+                        {budget.notes || '-'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Tooltip title="View Details">
+                        <IconButton
                           size="small"
                           color="primary"
-                          variant="outlined"
-                        />
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body1" fontWeight="bold" color="primary">
-                          ₹{(budget.totalBudget || 0).toLocaleString()}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={`${budget.categories?.length || 0} categories`}
+                          onClick={() => handleViewBudget(budget)}
+                        >
+                          <Visibility fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Edit Budget">
+                        <IconButton
                           size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Box sx={{ width: 100 }}>
-                            <LinearProgress
-                              variant="determinate"
-                              value={spentPercentage}
-                              color={getSpentColor(spentPercentage)}
-                            />
-                          </Box>
-                          <Typography variant="caption">
-                            {spentPercentage.toFixed(0)}%
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={budget.currency || 'INR'} size="small" variant="outlined" />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Tooltip title="View Details">
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            onClick={() => handleViewBudget(budget)}
-                          >
-                            <Visibility fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Edit Budget">
-                          <IconButton
-                            size="small"
-                            color="info"
-                            onClick={() => handleEditClick(budget)}
-                          >
-                            <Edit fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete">
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => handleDeleteClick(budget)}
-                          >
-                            <Delete fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
+                          color="info"
+                          onClick={() => handleEditClick(budget)}
+                        >
+                          <Edit fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleDeleteClick(budget)}
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
+                  <TableCell colSpan={6} align="center">
                     <Box sx={{ py: 4 }}>
                       <AccountBalanceWallet sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
                       <Typography color="textSecondary">
@@ -574,16 +512,17 @@ const Budget = () => {
       <Dialog
         open={viewDialogOpen}
         onClose={() => setViewDialogOpen(false)}
-        maxWidth="md"
+        maxWidth="sm"
         fullWidth
       >
         <DialogTitle>
-          Budget Details - {selectedBudget && `${MONTHS[(selectedBudget.month || 1) - 1]} ${selectedBudget.year}`}
+          Budget Details {selectedBudget && selectedBudget.month && selectedBudget.year && 
+            `- ${MONTHS[(selectedBudget.month || 1) - 1]} ${selectedBudget.year}`}
         </DialogTitle>
         <DialogContent dividers>
           {selectedBudget && (
             <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
+              <Grid item xs={12}>
                 <Typography variant="subtitle2" color="textSecondary">User</Typography>
                 <Typography variant="body1" gutterBottom>
                   {selectedBudget.userId?.name || 'Unknown'}
@@ -592,71 +531,30 @@ const Budget = () => {
                   {selectedBudget.userId?.email}
                 </Typography>
               </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography variant="subtitle2" color="textSecondary">Total Budget</Typography>
-                <Typography variant="h5" color="primary" gutterBottom>
-                  ₹{(selectedBudget.totalBudget || 0).toLocaleString()}
+              <Grid item xs={12} sm={6}>
+                <Typography variant="subtitle2" color="textSecondary">Period</Typography>
+                <Typography variant="body1">
+                  {selectedBudget.month && selectedBudget.year 
+                    ? `${MONTHS[(selectedBudget.month || 1) - 1]} ${selectedBudget.year}`
+                    : 'Not specified'}
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="subtitle2" color="textSecondary">Currency</Typography>
+                <Typography variant="body1">
+                  {selectedBudget.currency || 'INR'}
                 </Typography>
               </Grid>
               <Grid item xs={12}>
-                <Divider sx={{ my: 2 }} />
-                <Typography variant="h6" gutterBottom>Category Breakdown</Typography>
-                {selectedBudget.categories?.length > 0 ? (
-                  <TableContainer>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Category</TableCell>
-                          <TableCell align="right">Budget</TableCell>
-                          <TableCell align="right">Spent</TableCell>
-                          <TableCell>Progress</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {selectedBudget.categories.map((cat, index) => {
-                          const catPercentage = cat.amount > 0 ? ((cat.spent || 0) / cat.amount) * 100 : 0
-                          return (
-                            <TableRow key={index}>
-                              <TableCell>
-                                <Box display="flex" alignItems="center" gap={1}>
-                                  <Box
-                                    sx={{
-                                      width: 12,
-                                      height: 12,
-                                      borderRadius: '50%',
-                                      backgroundColor: cat.color || '#1976d2'
-                                    }}
-                                  />
-                                  {cat.name}
-                                </Box>
-                              </TableCell>
-                              <TableCell align="right">₹{(cat.amount || 0).toLocaleString()}</TableCell>
-                              <TableCell align="right">₹{(cat.spent || 0).toLocaleString()}</TableCell>
-                              <TableCell>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <LinearProgress
-                                    variant="determinate"
-                                    value={Math.min(catPercentage, 100)}
-                                    color={getSpentColor(catPercentage)}
-                                    sx={{ width: 80 }}
-                                  />
-                                  <Typography variant="caption">
-                                    {catPercentage.toFixed(0)}%
-                                  </Typography>
-                                </Box>
-                              </TableCell>
-                            </TableRow>
-                          )
-                        })}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                ) : (
-                  <Typography color="textSecondary">No categories defined</Typography>
-                )}
+                <Divider sx={{ my: 1 }} />
+                <Typography variant="subtitle2" color="textSecondary">Total Budget</Typography>
+                <Typography variant="h4" color="primary" gutterBottom>
+                  ₹{(selectedBudget.totalBudget || 0).toLocaleString()}
+                </Typography>
               </Grid>
               {selectedBudget.notes && (
                 <Grid item xs={12}>
+                  <Divider sx={{ my: 1 }} />
                   <Typography variant="subtitle2" color="textSecondary">Notes</Typography>
                   <Typography variant="body2">{selectedBudget.notes}</Typography>
                 </Grid>
@@ -673,20 +571,21 @@ const Budget = () => {
       <Dialog
         open={editDialogOpen}
         onClose={() => !editLoading && setEditDialogOpen(false)}
-        maxWidth="md"
+        maxWidth="sm"
         fullWidth
       >
         <DialogTitle>
           <Box display="flex" alignItems="center" gap={1}>
             <Edit color="primary" />
-            Manage Budget - {editBudget && `${MONTHS[(editBudget.month || 1) - 1]} ${editBudget.year}`}
+            Edit Budget {editBudget && editBudget.month && editBudget.year &&
+              `- ${MONTHS[(editBudget.month || 1) - 1]} ${editBudget.year}`}
           </Box>
         </DialogTitle>
         <DialogContent dividers>
           {editBudget && (
             <Grid container spacing={3}>
               {/* User Info (Read-only) */}
-              <Grid item xs={12} md={6}>
+              <Grid item xs={12}>
                 <Typography variant="subtitle2" color="textSecondary">User</Typography>
                 <Typography variant="body1">
                   {editBudget.userId?.name || 'Unknown'}
@@ -696,11 +595,36 @@ const Budget = () => {
                 </Typography>
               </Grid>
 
-              {/* Total Budget */}
-              <Grid item xs={12} md={6}>
+              {/* Month and Year */}
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Month</InputLabel>
+                  <Select
+                    value={editBudget.month || ''}
+                    label="Month"
+                    onChange={(e) => setEditBudget({ ...editBudget, month: e.target.value })}
+                  >
+                    {MONTHS.map((month, index) => (
+                      <MenuItem key={index} value={index + 1}>{month}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  label="Total Budget (₹)"
+                  label="Year"
+                  type="number"
+                  value={editBudget.year || ''}
+                  onChange={(e) => setEditBudget({ ...editBudget, year: Number(e.target.value) || '' })}
+                />
+              </Grid>
+
+              {/* Total Budget */}
+              <Grid item xs={12} sm={8}>
+                <TextField
+                  fullWidth
+                  label="Total Budget"
                   type="number"
                   value={editBudget.totalBudget}
                   onChange={(e) => setEditBudget({ 
@@ -710,6 +634,17 @@ const Budget = () => {
                   InputProps={{
                     startAdornment: <InputAdornment position="start">₹</InputAdornment>
                   }}
+                  required
+                />
+              </Grid>
+
+              {/* Currency */}
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  fullWidth
+                  label="Currency"
+                  value={editBudget.currency || 'INR'}
+                  onChange={(e) => setEditBudget({ ...editBudget, currency: e.target.value })}
                 />
               </Grid>
 
@@ -719,103 +654,11 @@ const Budget = () => {
                   fullWidth
                   label="Notes"
                   multiline
-                  rows={2}
+                  rows={3}
                   value={editBudget.notes}
                   onChange={(e) => setEditBudget({ ...editBudget, notes: e.target.value })}
                   placeholder="Add notes about this budget..."
                 />
-              </Grid>
-
-              {/* Categories */}
-              <Grid item xs={12}>
-                <Divider sx={{ my: 2 }} />
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                  <Typography variant="h6">Categories</Typography>
-                  <Button
-                    size="small"
-                    startIcon={<Add />}
-                    onClick={handleAddCategory}
-                    variant="outlined"
-                  >
-                    Add Category
-                  </Button>
-                </Box>
-                
-                {editBudget.categories?.length > 0 ? (
-                  <TableContainer component={Paper} variant="outlined">
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Category Name</TableCell>
-                          <TableCell align="right">Budget (₹)</TableCell>
-                          <TableCell align="right">Spent (₹)</TableCell>
-                          <TableCell>Color</TableCell>
-                          <TableCell align="center">Action</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {editBudget.categories.map((cat, index) => (
-                          <TableRow key={index}>
-                            <TableCell>
-                              <TextField
-                                size="small"
-                                value={cat.name}
-                                onChange={(e) => handleCategoryChange(index, 'name', e.target.value)}
-                                placeholder="Category name"
-                                fullWidth
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <TextField
-                                size="small"
-                                type="number"
-                                value={cat.amount}
-                                onChange={(e) => handleCategoryChange(index, 'amount', e.target.value)}
-                                InputProps={{
-                                  startAdornment: <InputAdornment position="start">₹</InputAdornment>
-                                }}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <TextField
-                                size="small"
-                                type="number"
-                                value={cat.spent || 0}
-                                onChange={(e) => handleCategoryChange(index, 'spent', e.target.value)}
-                                InputProps={{
-                                  startAdornment: <InputAdornment position="start">₹</InputAdornment>
-                                }}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <input
-                                type="color"
-                                value={cat.color || '#1976d2'}
-                                onChange={(e) => handleCategoryChange(index, 'color', e.target.value)}
-                                style={{ width: 40, height: 30, border: 'none', cursor: 'pointer' }}
-                              />
-                            </TableCell>
-                            <TableCell align="center">
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => handleRemoveCategory(index)}
-                              >
-                                <Delete fontSize="small" />
-                              </IconButton>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                ) : (
-                  <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
-                    <Typography color="textSecondary">
-                      No categories defined. Click "Add Category" to create one.
-                    </Typography>
-                  </Paper>
-                )}
               </Grid>
             </Grid>
           )}
@@ -844,10 +687,14 @@ const Budget = () => {
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete this budget for{' '}
-            <strong>
-              {selectedBudget && `${MONTHS[(selectedBudget.month || 1) - 1]} ${selectedBudget.year}`}
-            </strong>
+            Are you sure you want to delete this budget
+            {selectedBudget && selectedBudget.month && selectedBudget.year && (
+              <> for{' '}
+                <strong>
+                  {`${MONTHS[(selectedBudget.month || 1) - 1]} ${selectedBudget.year}`}
+                </strong>
+              </>
+            )}
             ?
           </Typography>
         </DialogContent>

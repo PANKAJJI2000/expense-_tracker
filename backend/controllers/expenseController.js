@@ -99,6 +99,81 @@ const expenseController = {
     } catch (error) {
       res.status(500).json({ error: 'Server error', details: error.message });
     }
+  },
+
+  async getExpensesByPeriod(req, res) {
+    try {
+      const { period } = req.query; // 'yearly', 'monthly', or 'weekly'
+      const userId = req.user._id;
+      
+      let groupBy, dateFormat, sortOrder;
+      
+      switch (period) {
+        case 'yearly':
+          groupBy = { year: { $year: '$date' } };
+          dateFormat = '%Y';
+          sortOrder = { '_id.year': 1 };
+          break;
+        case 'monthly':
+          groupBy = { 
+            year: { $year: '$date' },
+            month: { $month: '$date' }
+          };
+          dateFormat = '%Y-%m';
+          sortOrder = { '_id.year': 1, '_id.month': 1 };
+          break;
+        case 'weekly':
+          groupBy = {
+            year: { $year: '$date' },
+            week: { $week: '$date' }
+          };
+          dateFormat = '%Y-W%V';
+          sortOrder = { '_id.year': 1, '_id.week': 1 };
+          break;
+        default:
+          return res.status(400).json({ error: 'Invalid period. Use yearly, monthly, or weekly' });
+      }
+      
+      const expenses = await Expense.aggregate([
+        { $match: { userId } },
+        {
+          $group: {
+            _id: groupBy,
+            totalAmount: { $sum: '$amount' },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: sortOrder }
+      ]);
+      
+      // Format the response for bar graph
+      const formattedData = expenses.map(item => {
+        let label;
+        if (period === 'yearly') {
+          label = `${item._id.year}`;
+        } else if (period === 'monthly') {
+          const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          label = `${monthNames[item._id.month - 1]} ${item._id.year}`;
+        } else {
+          label = `Week ${item._id.week}, ${item._id.year}`;
+        }
+        
+        return {
+          label,
+          totalAmount: item.totalAmount,
+          count: item.count
+        };
+      });
+      
+      res.status(200).json({
+        success: true,
+        period,
+        data: formattedData,
+        total: formattedData.reduce((acc, item) => acc + item.totalAmount, 0)
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
   }
 };
 
