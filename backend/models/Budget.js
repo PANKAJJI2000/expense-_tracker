@@ -24,13 +24,6 @@ const budgetSchema = new mongoose.Schema(
       type: String,
       default: "INR",
     },
-    categories: [
-      {
-        name: String,
-        amount: Number,
-        spent: { type: Number, default: 0 },
-      },
-    ],
     notes: {
       type: String,
     },

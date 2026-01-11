@@ -10,7 +10,9 @@ const transactionSchema = new mongoose.Schema({
   
   // The category of the transaction
   category: {
-    type: String,  },
+    type: String,
+    default: 'General'
+  },
   
   // Item name/title - "Enter the item" field from screenshot
   item: {
@@ -33,10 +35,10 @@ const transactionSchema = new mongoose.Schema({
   },
   
   // The date of the transaction
-  // date: {
-  //   type: Date,
-  //   default: Date.now,
-  // },
+  date: {
+    type: Date,
+    required: true
+  },
   
   // The method of payment used for the transaction
   paymentMethod: {
@@ -55,6 +57,21 @@ const transactionSchema = new mongoose.Schema({
   type: {
     type: String,
     enum: ['income', 'expense'],
+    default: 'expense'
+  },
+  
+  // Additional fields for user information
+  fullName: {
+    type: String,
+    required: true
+  },
+  email: {
+    type: String,
+    required: true
+  },
+  phone: {
+    type: String,
+    required: true
   }
 }, {
   // Adds createdAt and updatedAt timestamps automatically
