@@ -45,7 +45,7 @@ function App() {
             <Route path="manage-expenses" element={<ManageExpenses />} />
             <Route path="income-tax-help" element={<IncomeTaxHelp />} />
             <Route path="settings" element={<Settings />} />
-            <Route path="sessions" element={<>Sessions Page</>} />
+            {/* <Route path="sessions" element={<>Sessions Page</>} /> */}
           </Route>
         </Routes>
       </Router>

@@ -37,7 +37,7 @@ const transactionSchema = new mongoose.Schema({
   // The date of the transaction
   date: {
     type: Date,
-    required: true
+    // required: true
   },
   
   // The method of payment used for the transaction
@@ -63,15 +63,15 @@ const transactionSchema = new mongoose.Schema({
   // Additional fields for user information
   fullName: {
     type: String,
-    required: true
+    // required: true
   },
   email: {
     type: String,
-    required: true
+    // required: true
   },
   phone: {
     type: String,
-    required: true
+    // required: true
   }
 }, {
   // Adds createdAt and updatedAt timestamps automatically

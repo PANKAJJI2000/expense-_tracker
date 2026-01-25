@@ -33,7 +33,14 @@ const getTransactionHistory = async (req, res) => {
       return res.status(401).json({ success: false, error: 'User not authenticated or user ID missing.' });
     }
     const userId = req.user._id;
-    const history = await TransactionHistory.find({ userId }).sort({ date: -1 });
+    
+    // Add type filter if provided in query
+    const query = { userId };
+    if (req.query.type) {
+      query.type = req.query.type;
+    }
+    
+    const history = await TransactionHistory.find(query).sort({ date: -1 });
 
     // Map and provide defaults for null/missing fields
     const formattedHistory = history.map(entry => ({
@@ -66,8 +73,14 @@ const getAllTransactions = async (req, res) => {
     }
     const userId = req.user._id;
     
+    // Add type filter if provided in query
+    const query = { userId };
+    if (req.query.type) {
+      query.type = req.query.type;
+    }
+    
     // Try TransactionHistory first, fallback to Transaction model if needed
-    let transactions = await TransactionHistory.find({ userId }).sort({ createdAt: -1 });
+    let transactions = await TransactionHistory.find(query).sort({ createdAt: -1 });
     
     // Map and provide defaults for null/missing fields
     const formattedTransactions = transactions.map(entry => ({
@@ -94,6 +107,51 @@ const getAllTransactions = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Server error', details: error.message });
+  }
+};
+
+const updateTransactionHistory = async (req, res) => {
+  try {
+    const id = req.params.id || req.params._id;
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Transaction history ID is required',
+      });
+    }
+
+    const updates = { ...req.body };
+    
+    // Ensure amount is stored as positive
+    if (updates.amount) {
+      updates.amount = Math.abs(updates.amount);
+    }
+
+    const updated = await TransactionHistory.findByIdAndUpdate(
+      id,
+      updates,
+      { new: true, runValidators: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({
+        success: false,
+        message: 'Transaction history not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Transaction history updated successfully',
+      data: updated,
+    });
+    
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      details: error.message,
+    });
   }
 };
 
@@ -136,5 +194,6 @@ module.exports = {
   createHistoryFromTransaction,
   getTransactionHistory,
   getAllTransactions,
+  updateTransactionHistory,
   deleteTransactionHistory,
 };

@@ -51,7 +51,7 @@ const menuItems = [
   { text: 'Manage Expenses', icon: <Description />, path: '/manage-expenses' },
   { text: 'Income Tax Help', icon: <AccountBalance />, path: '/income-tax-help' },
   { text: 'Budgets', icon: <AccountBalanceWallet />, path: '/budgets' },
-  { text: 'Sessions', icon: <Lock />, path: '/sessions' }, // Added
+  // { text: 'Sessions', icon: <Lock />, path: '/sessions' }, // Added
   { text: 'Settings', icon: <Settings />, path: '/settings' },
 ]
 

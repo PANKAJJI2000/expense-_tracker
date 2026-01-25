@@ -3,6 +3,131 @@ const User = require("../models/User");
 const mongoose = require("mongoose");
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
+
+// Helper function to convert image to base64 with data URI
+const convertToBase64DataURI = (imagePath) => {
+  try {
+    if (!imagePath) return null;
+
+    // If already a data URI, return as is
+    if (typeof imagePath === "string" && imagePath.startsWith("data:image")) {
+      return imagePath;
+    }
+
+    // If it's a file path, read and convert
+    if (typeof imagePath === "string" && fs.existsSync(imagePath)) {
+      const imageBuffer = fs.readFileSync(imagePath);
+      const base64String = imageBuffer.toString("base64");
+      // Detect image type from extension
+      const ext = path.extname(imagePath).toLowerCase();
+      const mimeType =
+        ext === ".png"
+          ? "image/png"
+          : ext === ".jpg" || ext === ".jpeg"
+          ? "image/jpeg"
+          : ext === ".webp"
+          ? "image/webp"
+          : "image/jpeg";
+      return `data:${mimeType};base64,${base64String}`;
+    }
+
+    // If it's a raw base64 string, add prefix
+    if (
+      typeof imagePath === "string" &&
+      !imagePath.includes("/") &&
+      !imagePath.includes("\\")
+    ) {
+      return `data:image/jpeg;base64,${imagePath}`;
+    }
+
+    return imagePath;
+  } catch (error) {
+    console.error("Error converting image to base64:", error);
+    return null;
+  }
+};
+
+// Helper function to format profile response
+const formatProfilePicture = (profilePicture) => {
+  console.log("=== formatProfilePicture called ===");
+  console.log("Input type:", typeof profilePicture);
+  console.log(
+    "Input value (first 50 chars):",
+    profilePicture ? profilePicture.substring(0, 50) : null
+  );
+
+  if (!profilePicture) return null;
+
+  // If already has data URI prefix, return as is
+  if (typeof profilePicture === "string" && profilePicture.startsWith("data:image")) {
+    console.log("Already has data URI prefix");
+    return profilePicture;
+  }
+
+  // If it's a file path (contains slashes or backslashes)
+  if (
+    typeof profilePicture === "string" &&
+    (profilePicture.includes("/") || profilePicture.includes("\\"))
+  ) {
+    console.log("Detected as file path");
+    const imageBuffer = fs.readFileSync(profilePicture);
+    const base64String = imageBuffer.toString("base64");
+    // Detect image type from extension
+    const ext = path.extname(profilePicture).toLowerCase();
+    let mimeType =
+      ext === ".png"
+        ? "image/png"
+        : ext === ".jpg" || ext === ".jpeg"
+        ? "image/jpeg"
+        : ext === ".webp"
+        ? "image/webp"
+        : "image/jpeg";
+    return `data:${mimeType};base64,${base64String}`;
+  }
+
+  // If it's a raw base64 string (no path, no prefix) - THIS IS YOUR CASE
+  if (typeof profilePicture === "string") {
+    console.log("Detected as raw base64 string");
+    let mimeType = "image/jpeg"; // default
+    if (profilePicture.startsWith("iVBOR")) {
+      mimeType = "image/png";
+      console.log("Detected PNG format");
+    } else if (profilePicture.startsWith("UklGR")) {
+      mimeType = "image/webp"; // WEBP format detected!
+      console.log("Detected WEBP format");
+    } else if (profilePicture.startsWith("/9j/")) {
+      mimeType = "image/jpeg";
+      console.log("Detected JPEG format");
+    }
+
+    const result = `data:${mimeType};base64,${profilePicture}`;
+    console.log("Result (first 100 chars):", result.substring(0, 100));
+    return result;
+  }
+
+  console.log("No format detected, returning as is");
+  return profilePicture;
+};
+
+const formatProfileResponse = (profile) => {
+  console.log("=== formatProfileResponse called ===");
+  if (!profile) return null;
+
+  // Convert to plain object
+  const formattedProfile = profile.toObject ? profile.toObject() : { ...profile };
+  console.log("Profile has profilePicture:", !!formattedProfile.profilePicture);
+
+  // Format the profile picture
+  if (formattedProfile.profilePicture) {
+    const originalLength = formattedProfile.profilePicture.length;
+    formattedProfile.profilePicture = formatProfilePicture(formattedProfile.profilePicture);
+    const newLength = formattedProfile.profilePicture ? formattedProfile.profilePicture.length : 0;
+    console.log(`ProfilePicture length: ${originalLength} -> ${newLength}`);
+  }
+
+  return formattedProfile;
+};
 
 // Multer config for profile images
 const storage = multer.diskStorage({
@@ -75,7 +200,7 @@ exports.createProfile = async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Profile created successfully",
-      data: profile,
+      data: formatProfileResponse(profile),
     });
   } catch (error) {
     res.status(400).json({
@@ -110,12 +235,15 @@ exports.getAllProfiles = async (req, res) => {
 
     const count = await Profile.countDocuments(query);
 
+    // Format all profiles with base64 data URI
+    const formattedProfiles = profiles.map(formatProfileResponse);
+
     res.status(200).json({
       success: true,
       count: profiles.length,
       totalPages: Math.ceil(count / limit),
       currentPage: page,
-      data: profiles,
+      data: formattedProfiles,
     });
   } catch (error) {
     res.status(500).json({
@@ -144,7 +272,7 @@ exports.getProfileById = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: profile,
+      data: formatProfileResponse(profile),
     });
   } catch (error) {
     res.status(500).json({
@@ -159,6 +287,9 @@ exports.getProfileById = async (req, res) => {
 // @access  Private
 exports.getProfileByUserId = async (req, res) => {
   try {
+    console.log("=== getProfileByUserId called ===");
+    console.log("User ID:", req.params.userId);
+
     const profile = await Profile.findOne({
       userId: req.params.userId,
     }).populate("userId", "username email");
@@ -170,11 +301,19 @@ exports.getProfileByUserId = async (req, res) => {
       });
     }
 
+    console.log("Profile found, formatting response...");
+    const formattedData = formatProfileResponse(profile);
+    console.log(
+      "Formatted data profilePicture (first 100 chars):",
+      formattedData.profilePicture ? formattedData.profilePicture.substring(0, 100) : null
+    );
+
     res.status(200).json({
       success: true,
-      data: profile,
+      data: formattedData,
     });
   } catch (error) {
+    console.error("Error in getProfileByUserId:", error);
     res.status(500).json({
       success: false,
       message: error.message,
@@ -196,7 +335,7 @@ exports.updateProfileByUserId = async (req, res) => {
     console.log("User ID:", req.params.userId);
     console.log("Uploaded file (userId):", req.file);
     console.log("Computed profilePicture (userId):", profilePicture);
-    
+
     // Validate MongoDB ObjectId format
     if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
       return res.status(400).json({
@@ -303,12 +442,12 @@ exports.updateProfile = async (req, res) => {
     const profilePicture = req.file
       ? req.file.path.replace(/\\/g, "/")
       : req.body.profilePicture;
-    
+
     console.log("Update User Request Body:", req.body);
     console.log("Profile ID:", req.params.id);
     console.log("Uploaded file (profileId):", req.file);
     console.log("Computed profilePicture (profileId):", profilePicture);
-    
+
     // Validate MongoDB ObjectId format
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({
@@ -321,7 +460,7 @@ exports.updateProfile = async (req, res) => {
     const existingProfile = await Profile.findById(req.params.id);
     if (!existingProfile) {
       console.log("Profile not found with ID:", req.params.id);
-      const allProfiles = await Profile.find({}).select('_id name email userId');
+      const allProfiles = await Profile.find({}).select("_id name email userId");
       console.log("Available profiles:", allProfiles);
       return res.status(404).json({
         success: false,
@@ -429,7 +568,7 @@ exports.deleteProfile = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Profile deleted successfully",
-      data: profile,
+      data: formatProfileResponse(profile),
     });
   } catch (error) {
     res.status(500).json({
@@ -508,7 +647,7 @@ exports.getProfileByEmail = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: profile,
+      data: formatProfileResponse(profile),
     });
   } catch (error) {
     return res.status(500).json({

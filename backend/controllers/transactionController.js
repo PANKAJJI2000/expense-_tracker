@@ -5,24 +5,24 @@ const transactionController = {
     try {
       const { title, amount, date, category, fullName, email, phone, type } = req.body;
       
-      // Validate required fields
-      if (!title || !amount || !date || !fullName || !email || !phone) {
+      // Validate required fields - only title and amount are required
+      if (!title || !amount) {
         return res.status(400).json({ 
           error: 'Missing required fields',
-          required: ['title', 'amount', 'date', 'fullName', 'email', 'phone']
+          required: ['title', 'amount']
         });
       }
       
-      // Create Transaction
+      // Create Transaction with optional fields
       const newTransaction = new Transaction({
         item: title,
         amount: parseInt(amount),
-        date: new Date(date),
+        date: date ? new Date(date) : new Date(),
         category: category || 'General',
         type: type || 'expense',
-        fullName,
-        email,
-        phone,
+        fullName: fullName || '',
+        email: email || '',
+        phone: phone || '',
         userId: req.user._id,
         status: 'completed'
       });

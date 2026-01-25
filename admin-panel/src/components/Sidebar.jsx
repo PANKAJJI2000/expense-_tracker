@@ -37,7 +37,7 @@ const Sidebar = () => {
     { text: 'Profiles', icon: <Person />, path: '/profiles' },
     { text: 'Transactions', icon: <SwapHoriz />, path: '/transactions' },
     { text: 'History', icon: <History />, path: '/history' },
-    { text: 'Sessions', icon: <Lock />, path: '/sessions' },
+    // { text: 'Sessions', icon: <Lock />, path: '/sessions' },
   ]
 
   return (
