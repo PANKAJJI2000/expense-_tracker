@@ -6,12 +6,7 @@ const transactionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User', // Reference to your User model
     required: true,
-  },
-  
-  // The category of the transaction
-  category: {
-    type: String,
-    default: 'General'
+    index: true
   },
   
   // Item name/title - "Enter the item" field from screenshot
@@ -28,16 +23,37 @@ const transactionSchema = new mongoose.Schema({
     min: 0,
   },
   
+  // The date of the transaction
+  date: {
+    type: Date,
+    default: Date.now,
+    index: true
+  },
+  
+  // The category of the transaction
+  category: {
+    type: String,
+    default: 'General'
+  },
+  
+  // The type of transaction - income or expense
+  type: {
+    type: String,
+    enum: ['income', 'expense'],
+    default: 'expense',
+    index: true
+  },
+  
+  // Icon for the transaction, if any
+  icon: {
+    type: String,
+    default: ''
+  },
+  
   // Invoice upload - stores file path or URL
   invoice: {
     type: String,
     default: null
-  },
-  
-  // The date of the transaction
-  date: {
-    type: Date,
-    // required: true
   },
   
   // The method of payment used for the transaction
@@ -49,34 +65,32 @@ const transactionSchema = new mongoose.Schema({
   // The current status of the transaction
   status: {
     type: String,
-    enum: ['pending', 'completed', 'cancelled'],
-    default: 'completed',
-  },
-  
-  // The type of transaction - income or expense
-  type: {
-    type: String,
-    enum: ['income', 'expense'],
-    default: 'expense'
+    enum: ['completed', 'pending', 'cancelled'],
+    default: 'completed'
   },
   
   // Additional fields for user information
   fullName: {
     type: String,
-    // required: true
+    default: ''
   },
   email: {
     type: String,
-    // required: true
+    default: ''
   },
   phone: {
     type: String,
-    // required: true
+    default: ''
   }
 }, {
   // Adds createdAt and updatedAt timestamps automatically
   timestamps: true,
 });
+
+// Create indexes for better query performance
+transactionSchema.index({ userId: 1, date: -1 });
+transactionSchema.index({ userId: 1, type: 1 });
+transactionSchema.index({ userId: 1, createdAt: -1 });
 
 // Create the model
 const Transaction = mongoose.model('Transaction', transactionSchema);

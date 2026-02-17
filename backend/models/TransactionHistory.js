@@ -64,6 +64,14 @@ const TransactionHistorySchema = new mongoose.Schema({
     type: String,
     enum: ['pending', 'completed', 'cancelled'],
     default: 'completed'
+  },
+
+  // Link back to the source Transaction (if synced from Transaction model)
+  sourceTransactionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Transaction',
+    default: null,
+    sparse: true
   }
   
 }, { 

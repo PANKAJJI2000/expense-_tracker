@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const TransactionHistory = require('../models/TransactionHistory');
+const Transaction = require('../models/Transaction');
 const mongoose = require('mongoose');
 
 // @desc    Get all transactions for a user
@@ -19,14 +20,51 @@ router.get('/:userId', async (req, res) => {
       });
     }
 
-    const transactions = await TransactionHistory.find({ userId })
-      .sort({ date: -1 }) // Most recent first
+    // 1. Get records from TransactionHistory collection
+    const historyRecords = await TransactionHistory.find({ userId })
+      .sort({ date: -1 })
       .lean();
+
+    // 2. Get IDs of transactions already synced to history
+    const syncedTransactionIds = historyRecords
+      .filter(h => h.sourceTransactionId)
+      .map(h => h.sourceTransactionId.toString());
+
+    // 3. Get Transaction records NOT already in history (un-synced older data)
+    const unsyncedQuery = { userId: userId.toString() };
+    if (syncedTransactionIds.length > 0) {
+      unsyncedQuery._id = { $nin: syncedTransactionIds.map(id => new mongoose.Types.ObjectId(id)) };
+    }
+    const unsyncedTransactions = await Transaction.find(unsyncedQuery)
+      .sort({ date: -1 })
+      .lean();
+
+    // 4. Map un-synced Transaction records to history format
+    const mappedUnsynced = unsyncedTransactions.map(t => ({
+      _id: t._id,
+      userId: t.userId,
+      date: t.date,
+      title: t.item || 'Untitled',
+      amount: t.amount,
+      type: t.type || 'expense',
+      category: t.category || 'General',
+      icon: t.icon || '',
+      note: t.note || '',
+      paymentMethod: t.paymentMethod || 'cash',
+      status: t.status || 'completed',
+      sourceTransactionId: t._id,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt
+    }));
+
+    // 5. Merge and sort by date descending
+    const allRecords = [...historyRecords, ...mappedUnsynced]
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
 
     res.status(200).json({
       success: true,
-      count: transactions.length,
-      data: transactions
+      count: allRecords.length,
+      data: allRecords
     });
   } catch (error) {
     res.status(500).json({

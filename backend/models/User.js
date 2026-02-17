@@ -6,7 +6,9 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "Profile",
     // required: true,
-    unique: true
+    unique: true,
+    sparse: true,
+    default: null
   },
   name: {
     type: String,
@@ -103,7 +105,7 @@ const userSchema = new mongoose.Schema({
 
 // Indexes
 userSchema.index({ email: 1 });
-userSchema.index({ username: 1 });
+userSchema.index({ name: 1 });
 userSchema.index({ profile: 1 });
 
 // Hash password before saving
