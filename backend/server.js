@@ -57,7 +57,7 @@ app.use(cors({
     ? (process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [
         'https://expense-tracker-rot7.onrender.com',
       ])
-    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'http://127.0.0.1:5173',"https://expense-tracker-rot7.onrender.com"],
+    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5000', 'http://localhost:5173', 'http://127.0.0.1:5173',"https://expense-tracker-rot7.onrender.com"],
   credentials: true, // Important for sessions
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],

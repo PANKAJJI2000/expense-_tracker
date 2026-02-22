@@ -4,6 +4,7 @@ const nodemailer = require("nodemailer");
 const axios = require('axios');
 const crypto = require('crypto');
 const User = require('../models/User');
+const Profile = require('../models/Profile');
 const { generateVerificationToken, sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail } = require('../utils/emailService');
 
 const authController = {
@@ -48,6 +49,25 @@ const authController = {
       const user = new User(userData);
 
       await user.save();
+
+      // Auto-create a matching Profile for this user
+      try {
+        const profile = await Profile.create({
+          userId: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone || "0000000000",
+          gender: user.gender || "other",
+          currency: user.currency || "INR",
+          profilePicture: user.profilePicture || "",
+        });
+        user.profile = profile._id;
+        await user.save();
+        console.log("✅ Auto-created profile during signup for:", user.email);
+      } catch (profileError) {
+        console.error("Failed to auto-create profile during signup:", profileError.message);
+        // Don't fail signup if profile creation fails
+      }
 
       // Generate token
       const token = jwt.sign(

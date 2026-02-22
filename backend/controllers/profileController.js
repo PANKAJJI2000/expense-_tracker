@@ -5,6 +5,20 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
+// Helper: strip sensitive/internal fields from User response
+const sanitizeUserResponse = (user) => {
+  const userObj = user.toObject ? user.toObject() : { ...user };
+  delete userObj.password;
+  delete userObj.resetPasswordToken;
+  delete userObj.resetPasswordExpire;
+  delete userObj.emailVerificationToken;
+  delete userObj.emailVerificationExpires;
+  delete userObj.passwordResetToken;
+  delete userObj.passwordResetExpires;
+  delete userObj.__v;
+  return userObj;
+};
+
 // Helper function to convert image to base64 with data URI
 const convertToBase64DataURI = (imagePath) => {
   try {
@@ -306,7 +320,7 @@ exports.getProfileByUserId = async (req, res) => {
         });
       }
 
-      profile = await Profile.create({
+      const profileData = {
         userId: user._id,
         name: user.name || "User",
         email: user.email,
@@ -314,11 +328,19 @@ exports.getProfileByUserId = async (req, res) => {
         gender: user.gender || "other",
         currency: user.currency || "INR",
         profilePicture: user.profilePicture || "",
-      });
+      };
 
-      // Update user with profile reference
-      user.profile = profile._id;
-      await user.save();
+      profile = await Profile.create(profileData);
+
+      // Sync back: update User with any missing fields from the new Profile defaults
+      const userUpdates = {};
+      if (!user.phone && profileData.phone) userUpdates.phone = profileData.phone;
+      if (!user.gender && profileData.gender) userUpdates.gender = profileData.gender;
+      if (!user.currency && profileData.currency) userUpdates.currency = profileData.currency;
+      if (!user.profilePicture && profileData.profilePicture) userUpdates.profilePicture = profileData.profilePicture;
+      userUpdates.profile = profile._id;
+
+      await User.findByIdAndUpdate(user._id, userUpdates);
 
       // Re-fetch with populate
       profile = await Profile.findById(profile._id).populate("userId", "username email");
@@ -395,17 +417,19 @@ exports.updateProfileByUserId = async (req, res) => {
       }
     }
 
+    // Build update object - include fields that are explicitly provided (even if empty string)
+    const updateFields = {};
+    if (name !== undefined) updateFields.name = name;
+    if (email !== undefined) updateFields.email = email;
+    if (phone !== undefined) updateFields.phone = phone;
+    if (gender !== undefined) updateFields.gender = gender;
+    if (currency !== undefined) updateFields.currency = currency;
+    if (profilePicture !== undefined) updateFields.profilePicture = profilePicture;
+
     // Update User model
     const updatedUser = await User.findByIdAndUpdate(
       req.params.userId,
-      {
-        ...(name && { name }),
-        ...(email && { email }),
-        ...(phone && { phone }),
-        ...(gender && { gender }),
-        ...(currency && { currency }),
-        ...(profilePicture && { profilePicture }),
-      },
+      updateFields,
       {
         new: true,
         runValidators: true,
@@ -419,17 +443,16 @@ exports.updateProfileByUserId = async (req, res) => {
       });
     }
 
-    // Upsert Profile
+    // Upsert Profile - also merge any fields that exist on User but not yet in the update
+    const profileUpdateFields = { ...updateFields };
+    if (!profileUpdateFields.phone && updatedUser.phone) profileUpdateFields.phone = updatedUser.phone;
+    if (!profileUpdateFields.gender && updatedUser.gender) profileUpdateFields.gender = updatedUser.gender;
+    if (!profileUpdateFields.currency && updatedUser.currency) profileUpdateFields.currency = updatedUser.currency;
+    if (!profileUpdateFields.profilePicture && updatedUser.profilePicture) profileUpdateFields.profilePicture = updatedUser.profilePicture;
+
     const updatedProfile = await Profile.findOneAndUpdate(
       { userId: req.params.userId },
-      {
-        ...(name && { name }),
-        ...(email && { email }),
-        ...(phone && { phone }),
-        ...(gender && { gender }),
-        ...(currency && { currency }),
-        ...(profilePicture && { profilePicture }),
-      },
+      profileUpdateFields,
       {
         new: true,
         runValidators: true,
@@ -437,14 +460,22 @@ exports.updateProfileByUserId = async (req, res) => {
       }
     );
 
+    // If profile was upserted, link it back to user
+    if (updatedProfile && !updatedUser.profile) {
+      await User.findByIdAndUpdate(req.params.userId, { profile: updatedProfile._id });
+    }
+
     console.log("Updated User:", updatedUser);
     console.log("Updated Profile:", updatedProfile);
+
+    // Sanitize user response - remove sensitive/internal fields
+    const sanitizedUser = sanitizeUserResponse(updatedUser);
 
     res.status(200).json({
       success: true,
       message: "User and profile updated successfully",
       data: {
-        user: updatedUser,
+        user: sanitizedUser,
         profile: updatedProfile,
       },
     });
@@ -517,17 +548,19 @@ exports.updateProfile = async (req, res) => {
       }
     }
 
+    // Build update object - include fields that are explicitly provided
+    const updateFields = {};
+    if (name !== undefined) updateFields.name = name;
+    if (email !== undefined) updateFields.email = email;
+    if (phone !== undefined) updateFields.phone = phone;
+    if (gender !== undefined) updateFields.gender = gender;
+    if (currency !== undefined) updateFields.currency = currency;
+    if (profilePicture !== undefined) updateFields.profilePicture = profilePicture;
+
     // Update User model
     const updatedUser = await User.findByIdAndUpdate(
       existingProfile.userId,
-      {
-        ...(name && { name }),
-        ...(email && { email }),
-        ...(phone && { phone }),
-        ...(gender && { gender }),
-        ...(currency && { currency }),
-        ...(profilePicture && { profilePicture }),
-      },
+      updateFields,
       {
         new: true,
         runValidators: true,
@@ -541,28 +574,30 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
-    // Update Profile
+    // Update Profile - also merge any fields from User that aren't in the update
+    const profileUpdateFields = { ...updateFields };
+    if (!profileUpdateFields.phone && updatedUser.phone) profileUpdateFields.phone = updatedUser.phone;
+    if (!profileUpdateFields.gender && updatedUser.gender) profileUpdateFields.gender = updatedUser.gender;
+    if (!profileUpdateFields.currency && updatedUser.currency) profileUpdateFields.currency = updatedUser.currency;
+    if (!profileUpdateFields.profilePicture && updatedUser.profilePicture) profileUpdateFields.profilePicture = updatedUser.profilePicture;
+
     const updatedProfile = await Profile.findByIdAndUpdate(
       req.params.id,
-      {
-        ...(name && { name }),
-        ...(email && { email }),
-        ...(phone && { phone }),
-        ...(gender && { gender }),
-        ...(currency && { currency }),
-        ...(profilePicture && { profilePicture }),
-      },
+      profileUpdateFields,
       { new: true, runValidators: true }
     );
 
     console.log("Updated User:", updatedUser);
     console.log("Updated Profile:", updatedProfile);
 
+    // Sanitize user response
+    const sanitizedUser = sanitizeUserResponse(updatedUser);
+
     res.status(200).json({
       success: true,
       message: "User and profile updated successfully",
       data: {
-        user: updatedUser,
+        user: sanitizedUser,
         profile: updatedProfile,
       },
     });

@@ -4,7 +4,7 @@ import axios from 'axios'
 const BASE_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.MODE === 'production' 
     ? 'https://expense-tracker-backend-48vm.onrender.com/api'
-    : 'http://localhost:3000/api')
+    : 'http://localhost:5000/api')
 
 console.log('Current Mode:', import.meta.env.MODE)
 console.log('API Base URL:', BASE_URL)

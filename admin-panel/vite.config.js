@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => ({
     'process.env.VITE_API_URL': JSON.stringify(
       mode === 'production'
         ? 'https://expense-tracker-backend-48vm.onrender.com/api'
-        : 'http://localhost:3000/api'
+        : 'http://localhost:5000/api'
     )
   },
   server: {
