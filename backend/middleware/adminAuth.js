@@ -29,50 +29,58 @@ const adminAuth = async (req, res, next) => {
     // Get user ID from token (supports both 'userId' and 'id' formats)
     const userId = decoded.userId || decoded.id;
 
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token format'
-      });
+    // Case 1: Token has a userId — look up the user in DB
+    if (userId) {
+      const user = await User.findById(userId).select('-password');
+
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      const isAdmin = decoded.role === 'admin' || user.role === 'admin';
+      if (!isAdmin) {
+        return res.status(403).json({ 
+          success: false,
+          message: 'Access denied. Admin privileges required.' 
+        });
+      }
+
+      if (!user.isActive) {
+        return res.status(403).json({
+          success: false,
+          message: 'Account is deactivated'
+        });
+      }
+
+      req.admin = {
+        id: user._id,
+        email: user.email || decoded.email,
+        role: 'admin',
+        name: user.name
+      };
+
+      return next();
     }
 
-    // Fetch user from database to verify admin status
-    const user = await User.findById(userId).select('-password');
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'User not found'
-      });
+    // Case 2: Env-based admin (token has email + role but no userId)
+    if (decoded.role === 'admin' && decoded.email) {
+      req.admin = {
+        id: null,
+        email: decoded.email,
+        role: 'admin',
+        name: 'Admin'
+      };
+      return next();
     }
 
-    // Check if user has admin role (from token or database)
-    const isAdmin = decoded.role === 'admin' || user.role === 'admin';
-
-    if (!isAdmin) {
-      return res.status(403).json({ 
-        success: false,
-        message: 'Access denied. Admin privileges required.' 
-      });
-    }
-
-    // Check if user is active
-    if (!user.isActive) {
-      return res.status(403).json({
-        success: false,
-        message: 'Account is deactivated'
-      });
-    }
-
-    // Attach admin info to request
-    req.admin = {
-      id: user._id,
-      email: user.email || decoded.email,
-      role: 'admin',
-      name: user.name
-    };
-
-    next();
+    // Neither case matched
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid token format'
+    });
   } catch (error) {
     console.error('Admin auth error:', error.message);
     

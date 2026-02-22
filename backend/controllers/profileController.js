@@ -19,128 +19,28 @@ const sanitizeUserResponse = (user) => {
   return userObj;
 };
 
-// Helper function to convert image to base64 with data URI
-const convertToBase64DataURI = (imagePath) => {
-  try {
-    if (!imagePath) return null;
-
-    // If already a data URI, return as is
-    if (typeof imagePath === "string" && imagePath.startsWith("data:image")) {
-      return imagePath;
-    }
-
-    // If it's a file path, read and convert
-    if (typeof imagePath === "string" && fs.existsSync(imagePath)) {
-      const imageBuffer = fs.readFileSync(imagePath);
-      const base64String = imageBuffer.toString("base64");
-      // Detect image type from extension
-      const ext = path.extname(imagePath).toLowerCase();
-      const mimeType =
-        ext === ".png"
-          ? "image/png"
-          : ext === ".jpg" || ext === ".jpeg"
-          ? "image/jpeg"
-          : ext === ".webp"
-          ? "image/webp"
-          : "image/jpeg";
-      return `data:${mimeType};base64,${base64String}`;
-    }
-
-    // If it's a raw base64 string, add prefix
-    if (
-      typeof imagePath === "string" &&
-      !imagePath.includes("/") &&
-      !imagePath.includes("\\")
-    ) {
-      return `data:image/jpeg;base64,${imagePath}`;
-    }
-
-    return imagePath;
-  } catch (error) {
-    console.error("Error converting image to base64:", error);
-    return null;
-  }
+// Helper: convert file path to a relative URL for serving via /uploads
+const toProfilePicUrl = (filePath) => {
+  if (!filePath) return null;
+  // Already a URL path like /uploads/profiles/xxx.jpg
+  if (filePath.startsWith("/uploads/")) return filePath;
+  // Normalize backslashes to forward slashes
+  const normalized = filePath.replace(/\\/g, "/");
+  // Extract everything from "uploads/" onward
+  const idx = normalized.indexOf("uploads/");
+  if (idx !== -1) return "/" + normalized.substring(idx);
+  // If it's just a filename, assume it's in uploads/profiles/
+  if (!normalized.includes("/")) return "/uploads/profiles/" + normalized;
+  return null;
 };
 
-// Helper function to format profile response
-const formatProfilePicture = (profilePicture) => {
-  console.log("=== formatProfilePicture called ===");
-  console.log("Input type:", typeof profilePicture);
-  console.log(
-    "Input value (first 50 chars):",
-    profilePicture ? profilePicture.substring(0, 50) : null
-  );
-
-  if (!profilePicture) return null;
-
-  // If already has data URI prefix, return as is
-  if (typeof profilePicture === "string" && profilePicture.startsWith("data:image")) {
-    console.log("Already has data URI prefix");
-    return profilePicture;
-  }
-
-  // If it's a file path (contains slashes or backslashes)
-  if (
-    typeof profilePicture === "string" &&
-    (profilePicture.includes("/") || profilePicture.includes("\\"))
-  ) {
-    console.log("Detected as file path");
-    const imageBuffer = fs.readFileSync(profilePicture);
-    const base64String = imageBuffer.toString("base64");
-    // Detect image type from extension
-    const ext = path.extname(profilePicture).toLowerCase();
-    let mimeType =
-      ext === ".png"
-        ? "image/png"
-        : ext === ".jpg" || ext === ".jpeg"
-        ? "image/jpeg"
-        : ext === ".webp"
-        ? "image/webp"
-        : "image/jpeg";
-    return `data:${mimeType};base64,${base64String}`;
-  }
-
-  // If it's a raw base64 string (no path, no prefix) - THIS IS YOUR CASE
-  if (typeof profilePicture === "string") {
-    console.log("Detected as raw base64 string");
-    let mimeType = "image/jpeg"; // default
-    if (profilePicture.startsWith("iVBOR")) {
-      mimeType = "image/png";
-      console.log("Detected PNG format");
-    } else if (profilePicture.startsWith("UklGR")) {
-      mimeType = "image/webp"; // WEBP format detected!
-      console.log("Detected WEBP format");
-    } else if (profilePicture.startsWith("/9j/")) {
-      mimeType = "image/jpeg";
-      console.log("Detected JPEG format");
-    }
-
-    const result = `data:${mimeType};base64,${profilePicture}`;
-    console.log("Result (first 100 chars):", result.substring(0, 100));
-    return result;
-  }
-
-  console.log("No format detected, returning as is");
-  return profilePicture;
-};
-
+// Helper: format profile response — returns file URL (no base64)
 const formatProfileResponse = (profile) => {
-  console.log("=== formatProfileResponse called ===");
   if (!profile) return null;
-
-  // Convert to plain object
-  const formattedProfile = profile.toObject ? profile.toObject() : { ...profile };
-  console.log("Profile has profilePicture:", !!formattedProfile.profilePicture);
-
-  // Format the profile picture
-  if (formattedProfile.profilePicture) {
-    const originalLength = formattedProfile.profilePicture.length;
-    formattedProfile.profilePicture = formatProfilePicture(formattedProfile.profilePicture);
-    const newLength = formattedProfile.profilePicture ? formattedProfile.profilePicture.length : 0;
-    console.log(`ProfilePicture length: ${originalLength} -> ${newLength}`);
-  }
-
-  return formattedProfile;
+  const obj = profile.toObject ? profile.toObject() : { ...profile };
+  // Convert stored file path to a serveable URL
+  obj.profilePicture = toProfilePicUrl(obj.profilePicture);
+  return obj;
 };
 
 // Multer config for profile images
@@ -249,7 +149,6 @@ exports.getAllProfiles = async (req, res) => {
 
     const count = await Profile.countDocuments(query);
 
-    // Format all profiles with base64 data URI
     const formattedProfiles = profiles.map(formatProfileResponse);
 
     res.status(200).json({
@@ -347,12 +246,7 @@ exports.getProfileByUserId = async (req, res) => {
       console.log("Auto-created profile for user:", user.email);
     }
 
-    console.log("Profile found, formatting response...");
     const formattedData = formatProfileResponse(profile);
-    console.log(
-      "Formatted data profilePicture (first 100 chars):",
-      formattedData.profilePicture ? formattedData.profilePicture.substring(0, 100) : null
-    );
 
     res.status(200).json({
       success: true,
