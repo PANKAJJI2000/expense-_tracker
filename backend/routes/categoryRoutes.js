@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const categoryController = require('../controllers/categoryController');
 
+// Top categories (must be before /:id to avoid conflict)
+router.get('/top', categoryController.getTopCategories);
+
 // Create category
 router.post('/', categoryController.createCategory);
 

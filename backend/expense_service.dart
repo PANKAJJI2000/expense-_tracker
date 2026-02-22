@@ -190,13 +190,52 @@ class ProfileService {
     if (authService.token != null) "Authorization": "Bearer ${authService.token}",
   };
 
-  /// Get current user's profile
-  Future<ApiResponse<Map<String, dynamic>>> getMyProfile() async {
+  /// Get profile by user ID (registered user)
+  Future<ApiResponse<Map<String, dynamic>>> getProfileByUserId(String userId) async {
     try {
-      final res = await http.get(Uri.parse("$baseUrl/profiles/me"), headers: _headers);
+      final res = await http.get(
+        Uri.parse("$baseUrl/profiles/user/$userId"),
+        headers: _headers,
+      );
       final data = jsonDecode(res.body);
       if (res.statusCode == 200) {
-        return ApiResponse(success: true, data: data);
+        return ApiResponse(success: true, data: data['data'] ?? data);
+      }
+      return ApiResponse(success: false, error: data['message'] ?? data['error']);
+    } catch (e) {
+      return ApiResponse(success: false, error: e.toString());
+    }
+  }
+
+  /// Create profile for a user
+  Future<ApiResponse<Map<String, dynamic>>> createProfile({
+    required String userId,
+    required String name,
+    required String email,
+    required String phone,
+    String? gender,
+    String? currency,
+    String? referredBy,
+  }) async {
+    try {
+      final body = {
+        "userId": userId,
+        "name": name,
+        "email": email,
+        "phone": phone,
+        if (gender != null) "gender": gender,
+        if (currency != null) "currency": currency,
+        if (referredBy != null) "referredBy": referredBy,
+      };
+
+      final res = await http.post(
+        Uri.parse("$baseUrl/profiles"),
+        headers: _headers,
+        body: jsonEncode(body),
+      );
+      final data = jsonDecode(res.body);
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        return ApiResponse(success: true, data: data['data'] ?? data, message: "Profile created");
       }
       return ApiResponse(success: false, error: data['message'] ?? data['error']);
     } catch (e) {
@@ -209,7 +248,8 @@ class ProfileService {
     try {
       final res = await http.get(Uri.parse("$baseUrl/profiles"), headers: _headers);
       if (res.statusCode == 200) {
-        return ApiResponse(success: true, data: jsonDecode(res.body));
+        final data = jsonDecode(res.body);
+        return ApiResponse(success: true, data: data['data'] ?? data);
       }
       final data = jsonDecode(res.body);
       return ApiResponse(success: false, error: data['message'] ?? data['error']);
@@ -218,13 +258,13 @@ class ProfileService {
     }
   }
 
-  /// Get profile by ID
+  /// Get profile by profile ID
   Future<ApiResponse<Map<String, dynamic>>> getProfileById(String id) async {
     try {
       final res = await http.get(Uri.parse("$baseUrl/profiles/$id"), headers: _headers);
       final data = jsonDecode(res.body);
       if (res.statusCode == 200) {
-        return ApiResponse(success: true, data: data);
+        return ApiResponse(success: true, data: data['data'] ?? data);
       }
       return ApiResponse(success: false, error: data['message'] ?? data['error']);
     } catch (e) {
@@ -232,7 +272,88 @@ class ProfileService {
     }
   }
 
-  /// Update profile
+  /// Update profile by user ID (registered user)
+  Future<ApiResponse<Map<String, dynamic>>> updateProfileByUserId({
+    required String userId,
+    String? name,
+    String? email,
+    String? phone,
+    String? gender,
+    String? currency,
+  }) async {
+    try {
+      final body = <String, dynamic>{};
+      if (name != null) body['name'] = name;
+      if (email != null) body['email'] = email;
+      if (phone != null) body['phone'] = phone;
+      if (gender != null) body['gender'] = gender;
+      if (currency != null) body['currency'] = currency;
+
+      final res = await http.put(
+        Uri.parse("$baseUrl/profiles/user/$userId"),
+        headers: _headers,
+        body: jsonEncode(body),
+      );
+      final data = jsonDecode(res.body);
+      if (res.statusCode == 200) {
+        return ApiResponse(success: true, data: data['data'] ?? data, message: "Profile updated");
+      }
+      return ApiResponse(success: false, error: data['message'] ?? data['error']);
+    } catch (e) {
+      return ApiResponse(success: false, error: e.toString());
+    }
+  }
+
+  /// Update profile with profile picture (multipart)
+  Future<ApiResponse<Map<String, dynamic>>> updateProfileWithPicture({
+    required String userId,
+    String? name,
+    String? email,
+    String? phone,
+    String? gender,
+    String? currency,
+    File? profilePicture,
+  }) async {
+    try {
+      final request = http.MultipartRequest(
+        'PUT',
+        Uri.parse("$baseUrl/profiles/user/$userId"),
+      );
+
+      // Add auth header
+      if (authService.token != null) {
+        request.headers['Authorization'] = 'Bearer ${authService.token}';
+      }
+
+      // Add text fields
+      if (name != null) request.fields['name'] = name;
+      if (email != null) request.fields['email'] = email;
+      if (phone != null) request.fields['phone'] = phone;
+      if (gender != null) request.fields['gender'] = gender;
+      if (currency != null) request.fields['currency'] = currency;
+
+      // Add profile picture
+      if (profilePicture != null) {
+        request.files.add(await http.MultipartFile.fromPath(
+          'profilePicture',
+          profilePicture.path,
+        ));
+      }
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return ApiResponse(success: true, data: data['data'] ?? data, message: "Profile updated");
+      }
+      return ApiResponse(success: false, error: data['message'] ?? data['error']);
+    } catch (e) {
+      return ApiResponse(success: false, error: e.toString());
+    }
+  }
+
+  /// Update profile by profile ID
   Future<ApiResponse<Map<String, dynamic>>> updateProfile({
     required String id,
     String? name,
@@ -256,8 +377,25 @@ class ProfileService {
       );
       final data = jsonDecode(res.body);
       if (res.statusCode == 200) {
-        return ApiResponse(success: true, data: data, message: "Profile updated");
+        return ApiResponse(success: true, data: data['data'] ?? data, message: "Profile updated");
       }
+      return ApiResponse(success: false, error: data['message'] ?? data['error']);
+    } catch (e) {
+      return ApiResponse(success: false, error: e.toString());
+    }
+  }
+
+  /// Delete profile by user ID
+  Future<ApiResponse<void>> deleteProfileByUserId(String userId) async {
+    try {
+      final res = await http.delete(
+        Uri.parse("$baseUrl/profiles/user/$userId"),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) {
+        return ApiResponse(success: true, message: "Profile deleted");
+      }
+      final data = jsonDecode(res.body);
       return ApiResponse(success: false, error: data['message'] ?? data['error']);
     } catch (e) {
       return ApiResponse(success: false, error: e.toString());
@@ -270,7 +408,7 @@ class ProfileService {
       final res = await http.get(Uri.parse("$baseUrl/profiles/referral/$code"), headers: _headers);
       final data = jsonDecode(res.body);
       if (res.statusCode == 200) {
-        return ApiResponse(success: true, data: data);
+        return ApiResponse(success: true, data: data['data'] ?? data);
       }
       return ApiResponse(success: false, error: data['message'] ?? data['error']);
     } catch (e) {
@@ -278,7 +416,25 @@ class ProfileService {
     }
   }
 
-  /// Delete profile
+  /// Get profile by email
+  Future<ApiResponse<Map<String, dynamic>>> getProfileByEmail(String email) async {
+    try {
+      final res = await http.post(
+        Uri.parse("$baseUrl/profiles/by-email"),
+        headers: _headers,
+        body: jsonEncode({"email": email}),
+      );
+      final data = jsonDecode(res.body);
+      if (res.statusCode == 200) {
+        return ApiResponse(success: true, data: data['data'] ?? data);
+      }
+      return ApiResponse(success: false, error: data['message'] ?? data['error']);
+    } catch (e) {
+      return ApiResponse(success: false, error: e.toString());
+    }
+  }
+
+  /// Delete profile by profile ID
   Future<ApiResponse<void>> deleteProfile(String id) async {
     try {
       final res = await http.delete(Uri.parse("$baseUrl/profiles/$id"), headers: _headers);
@@ -699,6 +855,28 @@ class CategoryService {
         return ApiResponse(success: true, message: "Category deleted");
       }
       final data = jsonDecode(res.body);
+      return ApiResponse(success: false, error: data['message'] ?? data['error']);
+    } catch (e) {
+      return ApiResponse(success: false, error: e.toString());
+    }
+  }
+
+  /// Get top categories by expense amount with percentage
+  /// [limit] - Number of top categories to return (default: 5)
+  /// [period] - Filter period: 'weekly', 'monthly', 'yearly', or null for lifetime
+  Future<ApiResponse<List<dynamic>>> getTopCategories({
+    int limit = 5,
+    String? period,
+  }) async {
+    try {
+      var url = "$baseUrl/categories/top?limit=$limit";
+      if (period != null) url += "&period=$period";
+
+      final res = await http.get(Uri.parse(url), headers: _headers);
+      final data = jsonDecode(res.body);
+      if (res.statusCode == 200) {
+        return ApiResponse(success: true, data: data['data'] ?? []);
+      }
       return ApiResponse(success: false, error: data['message'] ?? data['error']);
     } catch (e) {
       return ApiResponse(success: false, error: e.toString());

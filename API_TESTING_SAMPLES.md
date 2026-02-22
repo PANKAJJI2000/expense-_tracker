@@ -277,8 +277,29 @@ Authorization: Bearer <your_jwt_token>
 ### 8. Update Profile by ID
 **PUT** `/profiles/:id`
 
-### 9. Delete Profile
+### 9. Delete Profile by Profile ID
 **DELETE** `/profiles/:id`
+
+### 10. Delete Profile by User ID
+**DELETE** `/profiles/user/:userId`
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Profile deleted successfully",
+  "data": { ... }
+}
+```
+
+### 11. Get Profile by Email
+**POST** `/profiles/by-email`
+
+```json
+{
+  "email": "john@example.com"
+}
+```
 
 ---
 
@@ -441,6 +462,44 @@ Authorization: Bearer <your_jwt_token>
 
 ### 5. Delete Category
 **DELETE** `/categories/:id`
+
+### 6. Get Top Categories (by Expense Amount)
+**GET** `/categories/top`
+
+**Query Parameters:**
+- `limit`: Number of top categories (default: 5)
+- `period`: `weekly` | `monthly` | `yearly` | omit for lifetime
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Top categories retrieved successfully",
+  "count": 5,
+  "totalExpenses": 5000.00,
+  "highestExpense": {
+    "category": "Food",
+    "percentage": 35,
+    "amount": 1750.00
+  },
+  "data": [
+    {
+      "rank": 1,
+      "category": "Food",
+      "totalAmount": 1750.00,
+      "count": 45,
+      "percentage": 35
+    },
+    {
+      "rank": 2,
+      "category": "Transport",
+      "totalAmount": 1200.00,
+      "count": 30,
+      "percentage": 24
+    }
+  ]
+}
+```
 
 ---
 

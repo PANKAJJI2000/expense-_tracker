@@ -290,15 +290,39 @@ exports.getProfileByUserId = async (req, res) => {
     console.log("=== getProfileByUserId called ===");
     console.log("User ID:", req.params.userId);
 
-    const profile = await Profile.findOne({
+    let profile = await Profile.findOne({
       userId: req.params.userId,
     }).populate("userId", "username email");
 
     if (!profile) {
-      return res.status(404).json({
-        success: false,
-        message: "Profile not found for this user",
+      // Auto-create a default profile from User data if none exists
+      console.log("Profile not found, attempting to auto-create from User data...");
+      const user = await User.findById(req.params.userId);
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found with this ID",
+        });
+      }
+
+      profile = await Profile.create({
+        userId: user._id,
+        name: user.name || "User",
+        email: user.email,
+        phone: user.phone || "0000000000",
+        gender: user.gender || "other",
+        currency: user.currency || "INR",
+        profilePicture: user.profilePicture || "",
       });
+
+      // Update user with profile reference
+      user.profile = profile._id;
+      await user.save();
+
+      // Re-fetch with populate
+      profile = await Profile.findById(profile._id).populate("userId", "username email");
+      console.log("Auto-created profile for user:", user.email);
     }
 
     console.log("Profile found, formatting response...");
@@ -564,6 +588,44 @@ exports.deleteProfile = async (req, res) => {
         message: "Profile not found",
       });
     }
+
+    res.status(200).json({
+      success: true,
+      message: "Profile deleted successfully",
+      data: formatProfileResponse(profile),
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Delete profile by user ID
+// @route   DELETE /api/profiles/user/:userId
+// @access  Private
+exports.deleteProfileByUserId = async (req, res) => {
+  try {
+    // Validate MongoDB ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format",
+      });
+    }
+
+    const profile = await Profile.findOneAndDelete({ userId: req.params.userId });
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: "Profile not found for this user",
+      });
+    }
+
+    // Also clear profile reference from User model
+    await User.findByIdAndUpdate(req.params.userId, { profile: null });
 
     res.status(200).json({
       success: true,

@@ -20,8 +20,10 @@ class _ExpenseTrackerAppState extends State<ExpenseTrackerApp> {
   bool isLoading = false;
   bool isLoggedIn = false;
   String? errorMessage;
+  String? userId;
   List<dynamic> transactions = [];
   List<dynamic> categories = [];
+  List<dynamic> topCategories = [];
   Map<String, dynamic>? userProfile;
   Map<String, dynamic>? currentBudget;
   
@@ -51,7 +53,10 @@ class _ExpenseTrackerAppState extends State<ExpenseTrackerApp> {
     setState(() => isLoading = false);
 
     if (result.success) {
-      setState(() => isLoggedIn = true);
+      setState(() {
+        isLoggedIn = true;
+        userId = result.data?['data']?['user']?['id'];
+      });
       await loadDashboardData();
     } else {
       setState(() => errorMessage = result.error ?? 'Login failed');
@@ -74,7 +79,10 @@ class _ExpenseTrackerAppState extends State<ExpenseTrackerApp> {
     setState(() => isLoading = false);
 
     if (result.success) {
-      setState(() => isLoggedIn = true);
+      setState(() {
+        isLoggedIn = true;
+        userId = result.data?['data']?['user']?['id'] ?? result.data?['user']?['id'];
+      });
       await loadDashboardData();
     } else {
       setState(() => errorMessage = result.error ?? 'Registration failed');
@@ -98,9 +106,17 @@ class _ExpenseTrackerAppState extends State<ExpenseTrackerApp> {
     }
 
     // Load profile
-    final profileResult = await api.profiles.getMyProfile();
-    if (profileResult.success) {
-      setState(() => userProfile = profileResult.data);
+    if (userId != null) {
+      final profileResult = await api.profiles.getProfileByUserId(userId!);
+      if (profileResult.success) {
+        setState(() => userProfile = profileResult.data);
+      }
+    }
+
+    // Load top 5 categories
+    final topCatResult = await api.categories.getTopCategories(limit: 5);
+    if (topCatResult.success && topCatResult.data != null) {
+      setState(() => topCategories = topCatResult.data!);
     }
 
     // Load current month budget
@@ -149,8 +165,10 @@ class _ExpenseTrackerAppState extends State<ExpenseTrackerApp> {
     api.clearAuth();
     setState(() {
       isLoggedIn = false;
+      userId = null;
       transactions = [];
       categories = [];
+      topCategories = [];
       userProfile = null;
       currentBudget = null;
     });
@@ -305,6 +323,11 @@ class _ExpenseTrackerAppState extends State<ExpenseTrackerApp> {
             _buildBudgetCard(totalExpense),
           
           const SizedBox(height: 24),
+
+          // Top 5 Categories Card
+          _buildTopCategoriesCard(),
+
+          const SizedBox(height: 24),
           
           // Add transaction section
           const Text(
@@ -403,6 +426,205 @@ class _ExpenseTrackerAppState extends State<ExpenseTrackerApp> {
                   ),
                 );
               },
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Category colors for the chart
+  static const List<Color> _categoryColors = [
+    Colors.blue,
+    Color(0xFF2DD4BF), // teal/green
+    Colors.purple,
+    Color(0xFFFF4D6A), // pink/red
+    Colors.orange,
+  ];
+
+  String _selectedPeriod = 'Lifetime';
+
+  Widget _buildTopCategoriesCard() {
+    // Find highest expense category
+    final highestCategory = topCategories.isNotEmpty ? topCategories[0] : null;
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFF4DA8A0), // teal background matching screenshot
+        borderRadius: BorderRadius.circular(20),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Categories',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: DropdownButton<String>(
+                  value: _selectedPeriod,
+                  underline: const SizedBox(),
+                  isDense: true,
+                  items: ['Lifetime', 'Yearly', 'Monthly', 'Weekly']
+                      .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                      .toList(),
+                  onChanged: (value) async {
+                    if (value != null) {
+                      setState(() => _selectedPeriod = value);
+                      final periodMap = {
+                        'Lifetime': null,
+                        'Yearly': 'yearly',
+                        'Monthly': 'monthly',
+                        'Weekly': 'weekly',
+                      };
+                      final result = await api.categories.getTopCategories(
+                        limit: 5,
+                        period: periodMap[value],
+                      );
+                      if (result.success && result.data != null) {
+                        setState(() => topCategories = result.data!);
+                      }
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Content row: helper text + radial chart
+          Row(
+            children: [
+              // Left side - helper message
+              Expanded(
+                flex: 4,
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.85),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Text('🔥', style: TextStyle(fontSize: 18)),
+                          SizedBox(width: 6),
+                          Text(
+                            'Hi, need any help?',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Highest Expense:\n${highestCategory != null ? "${highestCategory['category']} (${highestCategory['percentage']}%)" : "No data"}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Right side - circular indicators (simplified radial chart)
+              Expanded(
+                flex: 5,
+                child: SizedBox(
+                  height: 160,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      for (int i = 0; i < topCategories.length && i < 5; i++)
+                        SizedBox(
+                          width: 160 - (i * 28.0),
+                          height: 160 - (i * 28.0),
+                          child: CircularProgressIndicator(
+                            value: (topCategories[i]['percentage'] ?? 0) / 100.0,
+                            strokeWidth: 10,
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              _categoryColors[i % _categoryColors.length],
+                            ),
+                          ),
+                        ),
+                      // Center icon
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.account_balance_wallet,
+                            color: Colors.white, size: 20),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Legend
+          ...List.generate(
+            topCategories.length > 5 ? 5 : topCategories.length,
+            (i) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 14,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      color: _categoryColors[i % _categoryColors.length],
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    '${topCategories[i]['category']} ${topCategories[i]['percentage']}%',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          if (topCategories.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'No expense data yet',
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+              ),
             ),
         ],
       ),

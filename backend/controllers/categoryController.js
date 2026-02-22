@@ -1,4 +1,5 @@
 const Category = require('../models/Category');
+const Expense = require('../models/Expense');
 
 // Create a new category
 const createCategory = async (req, res) => {
@@ -179,10 +180,88 @@ const deleteCategory = async (req, res) => {
     }
 };
 
+// Get top categories by expense amount with percentage
+const getTopCategories = async (req, res) => {
+    try {
+        const { limit = 5, period } = req.query;
+        const topLimit = parseInt(limit) || 5;
+
+        // Build date filter based on period
+        let dateFilter = {};
+        const now = new Date();
+        
+        if (period === 'weekly') {
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            dateFilter = { date: { $gte: weekAgo } };
+        } else if (period === 'monthly') {
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            dateFilter = { date: { $gte: startOfMonth } };
+        } else if (period === 'yearly') {
+            const startOfYear = new Date(now.getFullYear(), 0, 1);
+            dateFilter = { date: { $gte: startOfYear } };
+        }
+        // 'lifetime' or no period = no date filter
+
+        // Aggregate expenses by category
+        const pipeline = [
+            { $match: dateFilter },
+            {
+                $group: {
+                    _id: '$category',
+                    totalAmount: { $sum: '$amount' },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { totalAmount: -1 } },
+            { $limit: topLimit }
+        ];
+
+        const categoryExpenses = await Expense.aggregate(pipeline);
+
+        // Calculate total expenses for percentage
+        const totalExpenses = categoryExpenses.reduce((sum, cat) => sum + cat.totalAmount, 0);
+
+        // Format response with percentage
+        const topCategories = categoryExpenses.map((cat, index) => ({
+            rank: index + 1,
+            category: cat._id || 'Uncategorized',
+            totalAmount: cat.totalAmount,
+            count: cat.count,
+            percentage: totalExpenses > 0 
+                ? Math.round((cat.totalAmount / totalExpenses) * 100) 
+                : 0
+        }));
+
+        // Find highest expense category
+        const highestExpense = topCategories.length > 0 ? topCategories[0] : null;
+
+        res.status(200).json({
+            success: true,
+            message: 'Top categories retrieved successfully',
+            count: topCategories.length,
+            totalExpenses,
+            highestExpense: highestExpense ? {
+                category: highestExpense.category,
+                percentage: highestExpense.percentage,
+                amount: highestExpense.totalAmount
+            } : null,
+            data: topCategories
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching top categories',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     createCategory,
     getAllCategories,
     getCategoryById,
     updateCategory,
-    deleteCategory
+    deleteCategory,
+    getTopCategories
 };
