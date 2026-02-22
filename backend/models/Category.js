@@ -18,9 +18,32 @@ const categorySchema = new mongoose.Schema({
         required: [true, 'Category type is required'],
         enum: ['income', 'expense'],
         lowercase: true
+    },
+    icon: {
+        type: String,
+        trim: true,
+        default: '📁'
+    },
+    color: {
+        type: String,
+        trim: true,
+        default: '#6366f1'
+    },
+    budgetLimit: {
+        type: Number,
+        default: 0,
+        min: [0, 'Budget limit cannot be negative']
+    },
+    isActive: {
+        type: Boolean,
+        default: true
     }
 }, {
     timestamps: true
 });
+
+// Index for faster queries
+categorySchema.index({ type: 1, isActive: 1 });
+categorySchema.index({ name: 'text' });
 
 module.exports = mongoose.model('Category', categorySchema);
