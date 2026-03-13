@@ -5,6 +5,22 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
+const profilesUploadDir = path.resolve(__dirname, "..", "uploads", "profiles");
+
+const ensureProfilesUploadDir = () => {
+  if (!fs.existsSync(profilesUploadDir)) {
+    fs.mkdirSync(profilesUploadDir, { recursive: true });
+  }
+};
+
+const buildProfilePicturePath = (file) => {
+  if (!file) return undefined;
+  return `/uploads/profiles/${file.filename}`;
+};
+
+// Ensure folder exists at startup so multer never fails with ENOENT.
+ensureProfilesUploadDir();
+
 // Helper: strip sensitive/internal fields from User response
 const sanitizeUserResponse = (user) => {
   const userObj = user.toObject ? user.toObject() : { ...user };
@@ -46,8 +62,8 @@ const formatProfileResponse = (profile) => {
 // Multer config for profile images
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // adjust folder as needed
-    cb(null, path.join(__dirname, "..", "uploads", "profiles"));
+    ensureProfilesUploadDir();
+    cb(null, profilesUploadDir);
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
@@ -77,9 +93,8 @@ exports.uploadProfilePic = upload;
 exports.createProfile = async (req, res) => {
   try {
     const { userId, name, email, phone, gender, currency, referredBy } = req.body;
-    const profilePicture = req.file
-      ? req.file.path.replace(/\\/g, "/")
-      : req.body.profilePicture;
+    const uploadedPath = buildProfilePicturePath(req.file);
+    const profilePicture = uploadedPath !== undefined ? uploadedPath : req.body.profilePicture;
 
     // Check if profile already exists for this user
     const existingProfile = await Profile.findOne({ userId });
@@ -267,9 +282,8 @@ exports.getProfileByUserId = async (req, res) => {
 exports.updateProfileByUserId = async (req, res) => {
   try {
     const { name, email, phone, gender, currency } = req.body;
-    const profilePicture = req.file
-      ? req.file.path.replace(/\\/g, "/")
-      : req.body.profilePicture;
+    const uploadedPath = buildProfilePicturePath(req.file);
+    const profilePicture = uploadedPath !== undefined ? uploadedPath : req.body.profilePicture;
 
     console.log("Update User Request Body:", req.body);
     console.log("User ID:", req.params.userId);
@@ -388,9 +402,8 @@ exports.updateProfileByUserId = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const { name, email, phone, gender, currency } = req.body;
-    const profilePicture = req.file
-      ? req.file.path.replace(/\\/g, "/")
-      : req.body.profilePicture;
+    const uploadedPath = buildProfilePicturePath(req.file);
+    const profilePicture = uploadedPath !== undefined ? uploadedPath : req.body.profilePicture;
 
     console.log("Update User Request Body:", req.body);
     console.log("Profile ID:", req.params.id);
@@ -642,6 +655,74 @@ exports.getProfileByEmail = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Upload or update profile picture by user ID
+// @route   PATCH /api/profiles/user/:userId/profile-picture
+// @access  Private
+exports.updateProfilePictureByUserId = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format",
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "profilePicture file is required",
+      });
+    }
+
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const profilePicture = buildProfilePicturePath(req.file);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.userId,
+      { profilePicture },
+      { new: true, runValidators: true }
+    );
+
+    const updatedProfile = await Profile.findOneAndUpdate(
+      { userId: req.params.userId },
+      {
+        userId: req.params.userId,
+        profilePicture,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || "0000000000",
+      },
+      { new: true, runValidators: true, upsert: true }
+    );
+
+    if (updatedProfile && (!updatedUser.profile || updatedUser.profile.toString() !== updatedProfile._id.toString())) {
+      await User.findByIdAndUpdate(req.params.userId, { profile: updatedProfile._id });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile picture updated successfully",
+      data: {
+        profilePicture: toProfilePicUrl(profilePicture),
+        user: sanitizeUserResponse(updatedUser),
+        profile: formatProfileResponse(updatedProfile),
+      },
+    });
+  } catch (error) {
+    return res.status(400).json({
       success: false,
       message: error.message,
     });

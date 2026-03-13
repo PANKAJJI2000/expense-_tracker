@@ -227,18 +227,16 @@ Authorization: Bearer <your_jwt_token>
 ```json
 {
   "userId": "user_id",
-  "firstName": "John",
-  "lastName": "Doe",
-  "phone": "+1234567890",
-  "address": "123 Main St",
-  "city": "New York",
-  "state": "NY",
-  "zipCode": "10001",
-  "country": "USA",
-  "dateOfBirth": "1990-01-01",
-  "bio": "Software Developer"
+  "name": "John Doe",
+  "email": "john@example.com",
+  "phone": "+919876543210",
+  "gender": "male",
+  "currency": "INR"
 }
 ```
+
+You can also create with image using `multipart/form-data` and form field:
+- `profilePicture`: (file, optional)
 
 ### 2. Get All Profiles
 **GET** `/profiles`
@@ -257,8 +255,8 @@ Authorization: Bearer <your_jwt_token>
 
 ```json
 {
-  "firstName": "John",
-  "lastName": "Doe Updated",
+  "name": "John Updated",
+  "email": "john.updated@example.com",
   "phone": "+1234567890"
 }
 ```
@@ -270,17 +268,25 @@ Authorization: Bearer <your_jwt_token>
 
 **Form Data:**
 - `profilePicture`: (file)
-- `firstName`: "John"
-- `lastName`: "Doe"
+- `name`: "John"
+- `email`: "john@example.com"
 - Other profile fields...
 
-### 8. Update Profile by ID
+### 8. Update Only Profile Picture (Dedicated API)
+**PATCH** `/profiles/user/:userId/profile-picture`
+
+**Content-Type:** `multipart/form-data`
+
+**Form Data:**
+- `profilePicture`: (file, required)
+
+### 9. Update Profile by ID
 **PUT** `/profiles/:id`
 
-### 9. Delete Profile by Profile ID
+### 10. Delete Profile by Profile ID
 **DELETE** `/profiles/:id`
 
-### 10. Delete Profile by User ID
+### 11. Delete Profile by User ID
 **DELETE** `/profiles/user/:userId`
 
 **Response:**
@@ -292,7 +298,7 @@ Authorization: Bearer <your_jwt_token>
 }
 ```
 
-### 11. Get Profile by Email
+### 12. Get Profile by Email
 **POST** `/profiles/by-email`
 
 ```json

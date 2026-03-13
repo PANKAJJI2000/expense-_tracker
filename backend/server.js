@@ -92,6 +92,7 @@ app.use('/api/auto-expenses', autoExpenseRoutes);
 app.use('/api/admin', adminRoutes); // Admin panel specific routes
 app.use('/api/categories', categoryRoutes);
 app.use('/api/profiles', profileRoutes); // Profile routes
+app.use('/api/profile', profileRoutes); // Compatibility alias for singular path
 app.use('/api/users', userRoutes); // User routes
 app.use('/api/income-tax-help', incomeTaxHelpRoutes); // Income Tax Help form routes
 app.use('/api/manage-expense', manageExpenseRoutes); // Manage Expense form routes
@@ -99,9 +100,9 @@ app.use('/api/budgets', budgetRoutes); // Budget routes
 
 // Health check endpoint - Enhanced with session info
 app.get('/api/health', (req, res) => {
-  const baseUrl = process.env.NODE_ENV === 'production' 
-    ? 'https://expense-tracker-backend-48vm.onrender.com/'
-    : `http://localhost:${PORT}`;
+  const host = req.get('host');
+  const protocol = req.protocol;
+  const baseUrl = host ? `${protocol}://${host}` : `http://localhost:${PORT}`;
     
   res.json({ 
     status: 'Server running',
@@ -238,6 +239,7 @@ app.get('/api/admin/debug-transaction-history', async (req, res) => {
     });
   }
 });
+
 
 // Root route - Shows API information when visiting backend URL directly
 app.get('/', (req, res) => {
@@ -391,7 +393,7 @@ app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   // Backend URL that admin panel will connect to
   const baseUrl = process.env.NODE_ENV === 'production' 
-    ? 'https://expense-tracker-rot7.onrender.com' // Production backend URL
+    ? 'https://expense-tracker-backend-48vm.onrender.com' // Production backend URL
     : `http://localhost:${PORT}`; // Development backend URL
   console.log(`Admin panel endpoints available at ${baseUrl}/api/admin/`);
   console.log(`Admin panel should connect to: ${baseUrl}`);

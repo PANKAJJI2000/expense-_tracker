@@ -1,55 +1,109 @@
 ### Variables
-@baseURL = http://localhost:3000/api/profiles
-@profileId = REPLACE_WITH_ACTUAL_ID
+@apiBase = http://localhost:3000/api
+@profilesBase = {{apiBase}}/profiles
+@userId = REPLACE_WITH_USER_ID
+@profileId = REPLACE_WITH_PROFILE_ID
 
-### 1. Create a new profile
-POST {{baseURL}}
+### Optional auth token (if your middleware requires auth)
+@token = REPLACE_WITH_BEARER_TOKEN
+
+### 1. Create profile (JSON)
+POST {{profilesBase}}
 Content-Type: application/json
+Authorization: Bearer {{token}}
 
 {
+  "userId": "{{userId}}",
   "name": "John Doe",
   "email": "john.doe@example.com",
-  "phone": "+1234567890",
-  "profilePic": "https://example.com/profile.jpg",
-  "referredBy": "ABC123"
+  "phone": "+919876543210",
+  "gender": "male",
+  "currency": "INR"
 }
 
-### 2. Get all profiles
-GET {{baseURL}}
+### 1b. Create profile with picture (multipart)
+POST {{profilesBase}}
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
 
-### 3. Get profile by ID
-GET {{baseURL}}/{{profileId}}
+--WebAppBoundary
+Content-Disposition: form-data; name="userId"
 
-### 4. Update profile
-PUT {{baseURL}}/{{profileId}}
-Content-Type: application/json
+{{userId}}
+--WebAppBoundary
+Content-Disposition: form-data; name="name"
 
-{
-  "name": "John Smith",
-  "email": "john.smith@example.com",
-  "phone": "+1234567891"
-}
+John Doe Multipart
+--WebAppBoundary
+Content-Disposition: form-data; name="email"
 
-### 5. Get profile by referral code
-GET {{baseURL}}/referral/ABC123
+john.multipart@example.com
+--WebAppBoundary
+Content-Disposition: form-data; name="phone"
 
-### 6. Delete profile
-DELETE {{baseURL}}/{{profileId}}
++919123456789
+--WebAppBoundary
+Content-Disposition: form-data; name="gender"
 
-### 7. Test validation errors
-POST {{baseURL}}
-Content-Type: application/json
+male
+--WebAppBoundary
+Content-Disposition: form-data; name="currency"
 
-{
-  "name": "A",
-  "email": "invalid-email"
-}
+INR
+--WebAppBoundary
+Content-Disposition: form-data; name="profilePicture"; filename="avatar-create.jpg"
+Content-Type: image/jpeg
 
-### 8. Test duplicate email
-POST {{baseURL}}
-Content-Type: application/json
+< ./sample/avatar-create.jpg
+--WebAppBoundary--
 
-{
-  "name": "Jane Doe",
-  "email": "john.doe@example.com"
-}
+### 2. Update profile picture only (NEW dedicated API)
+PATCH {{profilesBase}}/user/{{userId}}/profile-picture
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="profilePicture"; filename="avatar.jpg"
+Content-Type: image/jpeg
+
+< ./sample/avatar.jpg
+--WebAppBoundary--
+
+### 3. Update profile + picture together (existing API)
+PUT {{profilesBase}}/user/{{userId}}
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="name"
+
+John Updated
+--WebAppBoundary
+Content-Disposition: form-data; name="phone"
+
++919999888877
+--WebAppBoundary
+Content-Disposition: form-data; name="gender"
+
+male
+--WebAppBoundary
+Content-Disposition: form-data; name="currency"
+
+USD
+--WebAppBoundary
+Content-Disposition: form-data; name="profilePicture"; filename="avatar-new.jpg"
+Content-Type: image/jpeg
+
+< ./sample/avatar-new.jpg
+--WebAppBoundary--
+
+### 4. Verify by user ID (check profilePicture URL)
+GET {{profilesBase}}/user/{{userId}}
+Authorization: Bearer {{token}}
+
+### 5. Verify by profile ID
+GET {{profilesBase}}/{{profileId}}
+Authorization: Bearer {{token}}
+
+### 6. Static file check (open in browser/curl)
+GET http://localhost:3000/uploads/profiles/REPLACE_WITH_FILE_NAME.jpg
